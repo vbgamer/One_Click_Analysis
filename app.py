@@ -1,91 +1,77 @@
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-import uvicorn
-import shutil
-import uuid
-from pathlib import Path
-import traceback
+import React, { useState } from "react";
+import axios from "axios";
+import "./styles.css";
 
-from agent import process_file
+function App() {
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [reportLink, setReportLink] = useState("");
 
-app = FastAPI(title="One Click Analysis", version="1.0")
+  const handleUpload = async () => {
+    if (!file) {
+      alert("Please upload a file first.");
+      return;
+    }
 
-# Allow frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    setLoading(true);
+    const formData = new FormData();
+    formData.append("file", file);
 
-# Upload & processed folders
-UPLOAD_DIR = Path("uploads"); UPLOAD_DIR.mkdir(exist_ok=True)
-PROCESSED_DIR = Path("processed"); PROCESSED_DIR.mkdir(exist_ok=True)
+    try {
+      const res = await axios.post("http://localhost:8000/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-# Serve processed reports and images
-app.mount("/processed", StaticFiles(directory="processed"), name="processed")
+      const job_id = res.data.job_id;
+      setReportLink(`http://localhost:8000/processed/${job_id}/report.html`);
+    } catch (error) {
+      console.error(error);
+      alert("Upload failed. Check backend logs.");
+    }
 
-jobs = {}
+    setLoading(false);
+  };
 
-# ------------------------------ FRONTEND PAGE -----------------------------
+  return (
+    <div className="app-container">
+      <div className="main-content">
+        <h1 style={{ margin: "20px" }}>📊 One Click Analysis</h1>
 
-@app.get("/", response_class=HTMLResponse)
-def frontend():
-    return """
-    <html>
-    <head>
-        <title>One Click Analysis</title>
-        <style>
-            body { font-family: Arial; padding: 40px; background: #f4f4f4; }
-            .card { background: white; padding: 30px; border-radius: 12px; width: 420px;
-                    box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-            button { padding: 12px 20px; background: black; color: white; 
-                     cursor: pointer; border-radius: 8px; border: none; }
-        </style>
-    </head>
-    <body>
-        <h1>📊 One Click Analysis</h1>
-        <p>Upload your dataset and get instant AI-generated reports.</p>
-        <div class="card">
-            <form method="post" action="/upload" enctype="multipart/form-data">
-                <input type="file" name="file" required><br><br>
-                <button type="submit">Generate Report</button>
-            </form>
+        <div style={{
+          background: "white",
+          padding: "30px",
+          borderRadius: "10px",
+          boxShadow: "var(--shadow)",
+          maxWidth: "450px",
+          margin: "auto",
+          textAlign: "center"
+        }}>
+          
+          <input
+            type="file"
+            onChange={(e) => setFile(e.target.files[0])}
+            style={{ marginBottom: "20px" }}
+          />
+
+          {!loading ? (
+            <button className="btn-primary" onClick={handleUpload}>
+              🔍 Generate Report
+            </button>
+          ) : (
+            <p>Processing... Please wait ⏳</p>
+          )}
+
+          {reportLink && (
+            <div style={{ marginTop: "20px" }}>
+              <a href={reportLink} target="_blank" rel="noopener noreferrer">
+                <button className="btn-secondary">📄 Open Report</button>
+              </a>
+            </div>
+          )}
         </div>
-    </body>
-    </html>
-    """
+      </div>
+    </div>
+  );
+}
 
-
-# ------------------------------ UPLOAD & PROCESS -----------------------------
-
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    job_id = str(uuid.uuid4())
-    dest = UPLOAD_DIR / f"{job_id}_{file.filename}"
-
-    # Save file
-    with open(dest, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    # Process instantly (not background for simplicity)
-    try:
-        report_path = process_file(str(dest), job_id=job_id)
-    except Exception as e:
-        return HTMLResponse(f"<h3>Error: {traceback.format_exc()}</h3>")
-
-    # Show link to report
-    return HTMLResponse(f"""
-        <h2>✔ Report generated!</h2>
-        <p><a href="/processed/{job_id}/report.html" target="_blank">Click here to open your report</a></p>
-        <br><a href="/">⬅ Back to Dashboard</a>
-    """)
-
-
-# ------------------------------ RUN SERVER -----------------------------
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+export default App;
