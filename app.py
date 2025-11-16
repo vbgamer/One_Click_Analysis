@@ -1,14 +1,18 @@
-
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
-import os, uuid, shutil, tempfile, traceback
+import shutil
+import uuid
 from pathlib import Path
-from agent import process_file, get_status, get_report_path
+import traceback
 
-app = FastAPI(title="AI Backend Prototype", version="1.0")
+from agent import process_file
 
+app = FastAPI(title="One Click Analysis", version="1.0")
+
+# Allow frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,59 +21,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+# Upload & processed folders
+UPLOAD_DIR = Path("uploads"); UPLOAD_DIR.mkdir(exist_ok=True)
+PROCESSED_DIR = Path("processed"); PROCESSED_DIR.mkdir(exist_ok=True)
+
+# Serve processed reports and images
+app.mount("/processed", StaticFiles(directory="processed"), name="processed")
 
 jobs = {}
 
+# ------------------------------ FRONTEND PAGE -----------------------------
+
+@app.get("/", response_class=HTMLResponse)
+def frontend():
+    return """
+    <html>
+    <head>
+        <title>One Click Analysis</title>
+        <style>
+            body { font-family: Arial; padding: 40px; background: #f4f4f4; }
+            .card { background: white; padding: 30px; border-radius: 12px; width: 420px;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+            button { padding: 12px 20px; background: black; color: white; 
+                     cursor: pointer; border-radius: 8px; border: none; }
+        </style>
+    </head>
+    <body>
+        <h1>📊 One Click Analysis</h1>
+        <p>Upload your dataset and get instant AI-generated reports.</p>
+        <div class="card">
+            <form method="post" action="/upload" enctype="multipart/form-data">
+                <input type="file" name="file" required><br><br>
+                <button type="submit">Generate Report</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+
+
+# ------------------------------ UPLOAD & PROCESS -----------------------------
+
 @app.post("/upload")
-async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...)):
     job_id = str(uuid.uuid4())
     dest = UPLOAD_DIR / f"{job_id}_{file.filename}"
+
+    # Save file
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    # launch background processing
-    jobs[job_id] = {"status": "queued", "filename": str(dest)}
-    background_tasks.add_task(_process, job_id, str(dest))
-    return {"job_id": job_id, "message": "File received. Processing started."}
 
-def _process(job_id: str, path: str):
+    # Process instantly (not background for simplicity)
     try:
-        jobs[job_id]["status"] = "processing"
-        report_path = process_file(path, job_id=job_id)
-        jobs[job_id]["status"] = "done"
-        jobs[job_id]["report"] = report_path
+        report_path = process_file(str(dest), job_id=job_id)
     except Exception as e:
-        jobs[job_id]["status"] = "failed"
-        jobs[job_id]["error"] = traceback.format_exc()
+        return HTMLResponse(f"<h3>Error: {traceback.format_exc()}</h3>")
 
-@app.get("/status/{job_id}")
-def status(job_id: str):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return jobs[job_id]
+    # Show link to report
+    return HTMLResponse(f"""
+        <h2>✔ Report generated!</h2>
+        <p><a href="/processed/{job_id}/report.html" target="_blank">Click here to open your report</a></p>
+        <br><a href="/">⬅ Back to Dashboard</a>
+    """)
 
-@app.get("/report/{job_id}", response_class=HTMLResponse)
-def get_report(job_id: str):
-    info = jobs.get(job_id)
-    if not info:
-        raise HTTPException(status_code=404, detail="Job not found")
-    if info.get("status") != "done":
-        raise HTTPException(status_code=400, detail="Report not ready")
-    report_path = info.get("report")
-    if not report_path or not Path(report_path).exists():
-        raise HTTPException(status_code=500, detail="Report missing")
-    return HTMLResponse(content=open(report_path, "r", encoding="utf-8").read())
 
-@app.get("/download/{job_id}")
-def download_report(job_id: str):
-    info = jobs.get(job_id)
-    if not info:
-        raise HTTPException(status_code=404, detail="Job not found")
-    report_path = info.get("report")
-    if not report_path or not Path(report_path).exists():
-        raise HTTPException(status_code=400, detail="Report not ready")
-    return FileResponse(report_path, media_type="text/html", filename=Path(report_path).name)
+# ------------------------------ RUN SERVER -----------------------------
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
