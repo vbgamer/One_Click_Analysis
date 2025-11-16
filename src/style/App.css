@@ -1,3 +1,4 @@
+/* FULL CSS you pasted */
 * {
   margin: 0;
   padding: 0;
@@ -20,11 +21,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Segoe UI', sans-serif;
   background-color: var(--background);
   color: var(--text-primary);
 }
@@ -32,28 +29,21 @@ body {
 .app-container {
   display: flex;
   height: 100vh;
-  overflow: hidden;
 }
 
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
-/* Buttons */
 .btn-primary, .btn-secondary {
   padding: 10px 20px;
   border: none;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
   transition: all 0.3s ease;
-  font-size: 14px;
 }
 
 .btn-primary {
@@ -61,15 +51,8 @@ body {
   color: white;
 }
 
-.btn-primary:hover:not(:disabled) {
+.btn-primary:hover {
   background-color: var(--primary-dark);
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .btn-secondary {
@@ -81,11 +64,4 @@ body {
 .btn-secondary:hover {
   background-color: var(--primary);
   color: white;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .app-container {
-    flex-direction: column;
-  }
 }
