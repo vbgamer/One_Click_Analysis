@@ -1,0 +1,189 @@
+.project-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.list-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.list-controls {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background-color: var(--surface);
+  flex: 1;
+  min-width: 250px;
+}
+
+.search-box input {
+  border: none;
+  background: none;
+  padding: 10px 0;
+  outline: none;
+  flex: 1;
+  font-size: 14px;
+}
+
+.search-box input::placeholder {
+  color: var(--text-secondary);
+}
+
+.sort-select {
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: 8px;
+  background-color: var(--surface);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: all 0.3s;
+}
+
+.sort-select:hover {
+  border-color: var(--primary);
+}
+
+.sort-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.projects-table {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead {
+  background-color: var(--background);
+  border-bottom: 2px solid var(--border);
+}
+
+th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.3s;
+}
+
+tbody tr:hover {
+  background-color: var(--background);
+}
+
+td {
+  padding: 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.project-name {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.completed {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  color: var(--primary);
+  background-color: var(--background);
+}
+
+@media (max-width: 768px) {
+  .project-list {
+    padding: 16px;
+  }
+
+  .list-header {
+    flex-direction: column;
+  }
+
+  .list-controls {
+    flex-direction: column;
+  }
+
+  .search-box {
+    min-width: 100%;
+  }
+
+  table {
+    font-size: 12px;
+  }
+
+  th,
+  td {
+    padding: 12px 8px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}
