@@ -1,0 +1,83 @@
+:root {
+  /* Primary Brand Colors */
+  --primary: #6366f1;
+  /* Indigo 500 */
+  --primary-dark: #4f46e5;
+  /* Indigo 600 */
+  --primary-light: #818cf8;
+  /* Indigo 400 */
+  --primary-soft: #e0e7ff;
+  /* Indigo 100 */
+
+  /* Secondary/Accent */
+  --secondary: #06b6d4;
+  /* Cyan 500 */
+  /* --- Premium Palette (Cosmic Luxury) --- */
+
+  /* Primary Accents (Violet/Fuchsia Gradient source) */
+  --primary: #7c3aed;
+  /* Violet 600 */
+  --primary-hover: #6d28d9;
+  /* Violet 700 */
+  --primary-glow: rgba(124, 58, 237, 0.5);
+
+  /* Secondary/Action */
+  --secondary: #10b981;
+  /* Emerald 500 */
+
+  /* Backgrounds (Dark Mode Native) */
+  --background: #030014;
+  /* Deep Space Black */
+  --surface: #0f172a;
+  /* Slate 900 (Card Bg) */
+  --surface-hover: #1e293b;
+  /* Slate 800 */
+  --surface-transparent: rgba(15, 23, 42, 0.7);
+  /* Glassmorphism */
+
+  /* Typography */
+  --text-primary: #f8fafc;
+  /* Slate 50 */
+  --text-secondary: #94a3b8;
+  /* Slate 400 */
+  --text-muted: #64748b;
+  /* Slate 500 */
+
+  /* Functional Colors */
+  --warning: #f59e0b;
+  /* Amber 500 */
+  --danger: #ef4444;
+  /* Red 500 */
+  --success: #10b981;
+  /* Emerald 500 */
+
+  /* Borders & Shadows */
+  --border: rgba(148, 163, 184, 0.1);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(124, 58, 237, 0.3);
+  /* Primary Glow */
+
+  /* Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 1rem;
+  --radius-full: 9999px;
+
+  /* Font Family */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Light Mode Override (Optional - keeping it dark-first for luxury feel) */
+/* We can keep light mode, but "Luxury" usually implies Dark Mode for SaaS */
+[data-theme='light'] {
+  --background: #ffffff;
+  --surface: #f8fafc;
+  --surface-hover: #f1f5f9;
+  --surface-transparent: rgba(255, 255, 255, 0.8);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border: #e2e8f0;
+  --shadow-glow: 0 0 15px rgba(124, 58, 237, 0.15);
+}

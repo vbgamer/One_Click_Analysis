@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Report for Online-Store-Orders.csv</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f9f9f9; }
+        h1, h2, h3 { color: #2c3e50; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .chart-container { text-align: center; }
+        .chart-container img { max-width: 100%; height: auto; border-radius: 4px; border: 1px solid #eee; }
+        .metric-box { display: inline-block; padding: 10px 20px; background: #e0f7fa; color: #006064; border-radius: 4px; margin-right: 10px; }
+        .importance-bar { background: #4caf50; height: 10px; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <h1>Analysis Report for Online-Store-Orders.csv</h1>
+    
+    <div class="card">
+        <h2>Dataset Overview</h2>
+        <p><strong>Rows:</strong> 1200 | <strong>Columns:</strong> 14</p>
+        <h3>Column Types</h3>
+        <ul>
+            
+            <li><strong>orderid</strong>: object</li>
+            
+            <li><strong>date</strong>: object</li>
+            
+            <li><strong>customerid</strong>: object</li>
+            
+            <li><strong>product</strong>: object</li>
+            
+            <li><strong>quantity</strong>: int64</li>
+            
+            <li><strong>unitprice</strong>: float64</li>
+            
+            <li><strong>shippingaddress</strong>: object</li>
+            
+            <li><strong>paymentmethod</strong>: object</li>
+            
+            <li><strong>orderstatus</strong>: object</li>
+            
+            <li><strong>trackingnumber</strong>: object</li>
+            
+            <li><strong>itemsincart</strong>: int64</li>
+            
+            <li><strong>couponcode</strong>: object</li>
+            
+            <li><strong>referralsource</strong>: object</li>
+            
+            <li><strong>totalprice</strong>: float64</li>
+            
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>EDA Summaries</h2>
+        <div style="overflow-x: auto;">
+             <!-- We just convert the summary dict to a basic table for simplicity -->
+             <table>
+                 <tr>
+                     <th>Statistic</th>
+                     
+                     <th>orderid</th>
+                     
+                     <th>date</th>
+                     
+                     <th>customerid</th>
+                     
+                     <th>product</th>
+                     
+                     <th>quantity</th>
+                     
+                     <th>unitprice</th>
+                     
+                     <th>shippingaddress</th>
+                     
+                     <th>paymentmethod</th>
+                     
+                     <th>orderstatus</th>
+                     
+                     <th>trackingnumber</th>
+                     
+                     <th>itemsincart</th>
+                     
+                     <th>couponcode</th>
+                     
+                     <th>referralsource</th>
+                     
+                     <th>totalprice</th>
+                     
+                 </tr>
+                 
+                 <tr>
+                     <td><strong>count</strong></td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200.0</td>
+                      
+                      <td>1200.0</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200.0</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200</td>
+                      
+                      <td>1200.0</td>
+                      
+                 </tr>
+                 
+                 <tr>
+                     <td><strong>mean</strong></td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>2.9458333333333333</td>
+                      
+                      <td>356.41275</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>5.485</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>1053.9683</td>
+                      
+                 </tr>
+                 
+                 <tr>
+                     <td><strong>min</strong></td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>1.0</td>
+                      
+                      <td>11.39</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>1.0</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>11.39</td>
+                      
+                 </tr>
+                 
+                 <tr>
+                     <td><strong>max</strong></td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>5.0</td>
+                      
+                      <td>699.93</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>10.0</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>3456.4</td>
+                      
+                 </tr>
+                 
+             </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Visualizations</h2>
+        <div class="grid">
+            
+            <div class="chart-container">
+                <img src="/static/charts/56b15446-3f34-495c-a6b8-2270214e383e/heatmap.png" alt="heatmap.png">
+                <p>heatmap.png</p>
+            </div>
+            
+            <div class="chart-container">
+                <img src="/static/charts/56b15446-3f34-495c-a6b8-2270214e383e/hist_quantity.png" alt="hist_quantity.png">
+                <p>hist_quantity.png</p>
+            </div>
+            
+            <div class="chart-container">
+                <img src="/static/charts/56b15446-3f34-495c-a6b8-2270214e383e/hist_unitprice.png" alt="hist_unitprice.png">
+                <p>hist_unitprice.png</p>
+            </div>
+            
+            <div class="chart-container">
+                <img src="/static/charts/56b15446-3f34-495c-a6b8-2270214e383e/hist_itemsincart.png" alt="hist_itemsincart.png">
+                <p>hist_itemsincart.png</p>
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>AutoML Analysis</h2>
+        
+            <p><strong>Target Column:</strong> totalprice</p>
+            <p><strong>Problem Type:</strong> regression</p>
+            
+            <h3>Performance Metrics</h3>
+            <div>
+                
+                <span class="metric-box"><strong>MSE:</strong> 235.1483</span>
+                
+                <span class="metric-box"><strong>RMSE:</strong> 15.3345</span>
+                
+            </div>
+
+            <h3>Feature Importance</h3>
+            <table>
+                <tr><th>Feature</th><th>Importance</th></tr>
+                
+                <tr>
+                    <td>unitprice</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 106.37186179227416px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.5319
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>quantity</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 93.53153339708226px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.4677
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>itemsincart</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 0.015453034591693981px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0001
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>referralsource_Facebook</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 0.005614474222133178px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0000
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>couponcode_SAVE10</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 0.0028862191298785356px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0000
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>referralsource_Google</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 0.0027307147900973334px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0000
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>product_Monitor</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 0.002430386644494187px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0000
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>orderstatus_Shipped</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 0.0023180585453146173px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0000
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>paymentmethod_Gift Card</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 0.002247832627277323px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0000
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>orderstatus_Delivered</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 0.0019867076333315945px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0000
+                        </div>
+                    </td>
+                </tr>
+                
+            </table>
+        
+    </div>
+
+    <div class="card">
+        <h2>Automated Insights</h2>
+        <p>This dataset has 1200 records. 
+        
+        The key driver analysis focused on predicting <strong>totalprice</strong>. 
+        The top influencing factor was <strong>unitprice</strong>.
+        
+        </p>
+    </div>
+
+</body>
+</html>

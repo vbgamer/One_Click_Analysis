@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Report for transactions_map.csv</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f9f9f9; }
+        h1, h2, h3 { color: #2c3e50; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .chart-container { text-align: center; }
+        .chart-container img { max-width: 100%; height: auto; border-radius: 4px; border: 1px solid #eee; }
+        .metric-box { display: inline-block; padding: 10px 20px; background: #e0f7fa; color: #006064; border-radius: 4px; margin-right: 10px; }
+        .importance-bar { background: #4caf50; height: 10px; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <h1>Analysis Report for transactions_map.csv</h1>
+    
+    <div class="card">
+        <h2>Dataset Overview</h2>
+        <p><strong>Rows:</strong> 4507 | <strong>Columns:</strong> 16</p>
+        <h3>Column Types</h3>
+        <ul>
+            
+            <li><strong>id</strong>: int64</li>
+            
+            <li><strong>icij_sar_id</strong>: int64</li>
+            
+            <li><strong>filer_org_name_id</strong>: object</li>
+            
+            <li><strong>filer_org_name</strong>: object</li>
+            
+            <li><strong>begin_date</strong>: object</li>
+            
+            <li><strong>end_date</strong>: object</li>
+            
+            <li><strong>originator_bank_id</strong>: object</li>
+            
+            <li><strong>originator_bank</strong>: object</li>
+            
+            <li><strong>originator_bank_country</strong>: object</li>
+            
+            <li><strong>originator_iso</strong>: object</li>
+            
+            <li><strong>beneficiary_bank_id</strong>: object</li>
+            
+            <li><strong>beneficiary_bank</strong>: object</li>
+            
+            <li><strong>beneficiary_bank_country</strong>: object</li>
+            
+            <li><strong>beneficiary_iso</strong>: object</li>
+            
+            <li><strong>number_transactions</strong>: float64</li>
+            
+            <li><strong>amount_transactions</strong>: float64</li>
+            
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>EDA Summaries</h2>
+        <div style="overflow-x: auto;">
+             <!-- We just convert the summary dict to a basic table for simplicity -->
+             <table>
+                 <tr>
+                     <th>Statistic</th>
+                     
+                     <th>id</th>
+                     
+                     <th>icij_sar_id</th>
+                     
+                     <th>filer_org_name_id</th>
+                     
+                     <th>filer_org_name</th>
+                     
+                     <th>begin_date</th>
+                     
+                     <th>end_date</th>
+                     
+                     <th>originator_bank_id</th>
+                     
+                     <th>originator_bank</th>
+                     
+                     <th>originator_bank_country</th>
+                     
+                     <th>originator_iso</th>
+                     
+                     <th>beneficiary_bank_id</th>
+                     
+                     <th>beneficiary_bank</th>
+                     
+                     <th>beneficiary_bank_country</th>
+                     
+                     <th>beneficiary_iso</th>
+                     
+                     <th>number_transactions</th>
+                     
+                     <th>amount_transactions</th>
+                     
+                 </tr>
+                 
+                 <tr>
+                     <td><strong>count</strong></td>
+                      
+                      <td>4507.0</td>
+                      
+                      <td>4507.0</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507</td>
+                      
+                      <td>4507.0</td>
+                      
+                      <td>4507.0</td>
+                      
+                 </tr>
+                 
+                 <tr>
+                     <td><strong>mean</strong></td>
+                      
+                      <td>233598.41735078767</td>
+                      
+                      <td>3046.542933214999</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>4.129435850773431</td>
+                      
+                      <td>7917072.994233414</td>
+                      
+                 </tr>
+                 
+                 <tr>
+                     <td><strong>min</strong></td>
+                      
+                      <td>223254.0</td>
+                      
+                      <td>2208.0</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>1.0</td>
+                      
+                      <td>1.18</td>
+                      
+                 </tr>
+                 
+                 <tr>
+                     <td><strong>max</strong></td>
+                      
+                      <td>243960.0</td>
+                      
+                      <td>4411.0</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>nan</td>
+                      
+                      <td>174.0</td>
+                      
+                      <td>2721000000.0</td>
+                      
+                 </tr>
+                 
+             </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Visualizations</h2>
+        <div class="grid">
+            
+            <div class="chart-container">
+                <img src="/static/charts/b067091b-23a6-4b0d-9961-d34f3d5361f1/heatmap.png" alt="heatmap.png">
+                <p>heatmap.png</p>
+            </div>
+            
+            <div class="chart-container">
+                <img src="/static/charts/b067091b-23a6-4b0d-9961-d34f3d5361f1/hist_id.png" alt="hist_id.png">
+                <p>hist_id.png</p>
+            </div>
+            
+            <div class="chart-container">
+                <img src="/static/charts/b067091b-23a6-4b0d-9961-d34f3d5361f1/hist_icij_sar_id.png" alt="hist_icij_sar_id.png">
+                <p>hist_icij_sar_id.png</p>
+            </div>
+            
+            <div class="chart-container">
+                <img src="/static/charts/b067091b-23a6-4b0d-9961-d34f3d5361f1/hist_number_transactions.png" alt="hist_number_transactions.png">
+                <p>hist_number_transactions.png</p>
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>AutoML Analysis</h2>
+        
+            <p><strong>Target Column:</strong> amount_transactions</p>
+            <p><strong>Problem Type:</strong> regression</p>
+            
+            <h3>Performance Metrics</h3>
+            <div>
+                
+                <span class="metric-box"><strong>MSE:</strong> 2252448549707789.0000</span>
+                
+                <span class="metric-box"><strong>RMSE:</strong> 47459967.8646</span>
+                
+            </div>
+
+            <h3>Feature Importance</h3>
+            <table>
+                <tr><th>Feature</th><th>Importance</th></tr>
+                
+                <tr>
+                    <td>originator_bank_Amsterdam Trade Bank NV</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 27.777561352005648px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.1389
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>begin_date_Aug 8, 2011</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 18.792050563883773px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0940
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>end_date_Aug 8, 2011</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 16.48383716425768px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0824
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>number_transactions</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 12.18649256838499px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0609
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>beneficiary_bank_id_jp-morgan-us-usa</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 8.288978596279483px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0414
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>originator_bank_id_amsterdam-trade-bank-nv</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 8.163200126356893px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0408
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>originator_iso_NLD</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 6.8207404361507145px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0341
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>id</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 6.7267148780757555px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0336
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>end_date_Feb 24, 2016</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 6.551886196424812px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0328
+                        </div>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <td>beneficiary_bank_id_rosbank-moscow-russia-rus</td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <div style="width: 4.15877793883646px; background: #2196F3; height: 10px; margin-right: 10px;"></div>
+                            0.0208
+                        </div>
+                    </td>
+                </tr>
+                
+            </table>
+        
+    </div>
+
+    <div class="card">
+        <h2>Automated Insights</h2>
+        <p>This dataset has 4507 records. 
+        
+        The key driver analysis focused on predicting <strong>amount_transactions</strong>. 
+        The top influencing factor was <strong>originator_bank_Amsterdam Trade Bank NV</strong>.
+        
+        </p>
+    </div>
+
+</body>
+</html>
