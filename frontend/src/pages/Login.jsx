@@ -42,7 +42,13 @@ const Login = () => {
                 navigate('/dashboard');
             }
         } catch (err) {
-            setError(err.response?.data?.detail || 'Authentication failed');
+            console.error("Auth Exception:", err);
+
+            if (err.message === 'Network Error') {
+                setError('Network Error: Cannot connect to the backend server. Make sure it is running and CORS is configured.');
+            } else {
+                setError(err.response?.data?.detail || 'Authentication failed. Please check your credentials.');
+            }
         }
     };
 
