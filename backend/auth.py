@@ -7,10 +7,13 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import models, schemas, database
 
-# SECRET_KEY should be in env vars, hardcoding for demo
-SECRET_KEY = "supersecretkeyoneclickanalysis"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+import os
+
+# SECRET_KEY should be in env vars, falling back to default for local dev only
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "supersecretkeyoneclickanalysis")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+# 1-day expiration for better UX in production
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")

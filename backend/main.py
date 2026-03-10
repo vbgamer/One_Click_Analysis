@@ -25,6 +25,15 @@ origins = [
     "http://localhost:8000",
 ]
 
+# Allow custom production URLs from environment variables
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    origins.append(frontend_url.rstrip("/"))
+
+allowed_origins = os.getenv("ALLOWED_ORIGINS")
+if allowed_origins:
+    origins.extend([o.strip().rstrip("/") for o in allowed_origins.split(",")])
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
