@@ -6,7 +6,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 import models, schemas, database
-
 import os
 
 # SECRET_KEY should be in env vars, falling back to default for local dev only
@@ -52,3 +51,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
     return user
+
+def get_current_admin_user(current_user: models.User = Depends(get_current_user)):
+    """Guard: only allows users with role='admin' to proceed."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required."
+        )
+    return current_user

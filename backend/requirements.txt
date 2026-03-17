@@ -204,3 +204,4 @@ ydata-profiling
 zope.event
 zope.interface
 pyautogen
+psycopg2-binary

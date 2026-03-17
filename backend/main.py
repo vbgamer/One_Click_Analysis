@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import models, schemas, auth, database
 from database import engine
+from routers import admin as admin_router
 
 # ML Imports
 from ml import etl, eda, automl, viz, reporting, insights
@@ -18,11 +19,58 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="One Click Analysis API")
 
+# Register admin router
+app.include_router(admin_router.router)
+
+# ── Seed Default Users on Startup ────────────────────────────────────────────
+@app.on_event("startup")
+def seed_users():
+    """Create default admin + test users if they don't already exist."""
+    db = next(database.get_db())
+    seed_data = [
+        {
+            "email": "admin@admin.com",
+            "name": "Administrator",
+            "password": "Admin@2003",
+            "role": "admin",
+            "credits": 99999999,   # Effectively unlimited
+        },
+        {
+            "email": "customer1@customer.com",
+            "name": "Customer One",
+            "password": "ved@123",
+            "role": "user",
+            "credits": 99999999,   # Effectively unlimited
+        },
+        {
+            "email": "customer2@customer.com",
+            "name": "Customer Two",
+            "password": "ved@123",
+            "role": "user",
+            "credits": 100,
+        },
+    ]
+    for s in seed_data:
+        existing = db.query(models.User).filter(models.User.email == s["email"]).first()
+        if not existing:
+            new_user = models.User(
+                email=s["email"],
+                name=s["name"],
+                hashed_password=auth.get_password_hash(s["password"]),
+                role=s["role"],
+                credits=s["credits"],
+            )
+            db.add(new_user)
+    db.commit()
+    db.close()
+
 # CORS
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:8000",
+    "http://192.168.0.103:5173",  # LAN access
+    "http://192.168.0.103:8000",
 ]
 
 # Allow custom production URLs from environment variables
@@ -168,6 +216,24 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
     return current_user
 
+# --- Credit Request Endpoint (User Side) ---
+@app.post("/credits/request", response_model=schemas.CreditRequestOut)
+def request_credits(
+    payload: schemas.CreditRequestCreate,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Allow a user to request additional credits from admin."""
+    new_req = models.CreditRequest(
+        user_id=current_user.id,
+        amount_requested=payload.amount_requested,
+        note=payload.note
+    )
+    db.add(new_req)
+    db.commit()
+    db.refresh(new_req)
+    return new_req
+
 # --- Core App Endpoints ---
 @app.post("/upload", response_model=schemas.Job)
 async def upload_file(
@@ -176,6 +242,14 @@ async def upload_file(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(database.get_db)
 ):
+    # --- Credit Check --- 
+    ANALYSIS_COST = 100
+    if current_user.credits != -1 and current_user.credits < ANALYSIS_COST:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient credits. You need {ANALYSIS_COST} credits to run an analysis. Current balance: {current_user.credits}."
+        )
+
     # Create Job
     job_id = str(uuid.uuid4())
     file_ext = os.path.splitext(file.filename)[1]
@@ -184,6 +258,11 @@ async def upload_file(
     # Save file
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+
+    # Deduct credits
+    if current_user.credits != -1:
+        current_user.credits -= ANALYSIS_COST
+        db.commit()
         
     new_job = models.Job(
         id=job_id,
