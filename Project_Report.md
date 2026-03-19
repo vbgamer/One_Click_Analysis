@@ -24,16 +24,19 @@ The frontend serves as the user's interactive command center, heavily inspired b
 ### **2.2. Server-Side (Backend)**
 The backend operates as the asynchronous data processing pipeline and API gateway.
 - **Framework:** FastAPI (Python) running on an ASGI Uvicorn server, providing extremely fast, asynchronous request handling.
-- **Database Layer:** SQLAlchemy ORM managing SQLite for local, lightweight persistence of user credentials, job statuses, and historical report metadata.
-- **Security:** JSON Web Token (JWT) architecture for secure, stateless user authentication and route protection.
+- **Database Layer:** SQLAlchemy ORM securely connecting to a **Supabase PostgreSQL** cloud database via an IPv4 Session Pooler. This handles persistent storage of user credentials, robust credit transaction logs, job statuses, and historical report metadata. (Local fallback via SQLite is elegantly supported).
+- **Security & Authorization:** JSON Web Token (JWT) architecture for secure, stateless user authentication, featuring Role-Based Access Control (RBAC) to differentiate standard users from administrators.
 - **Job Management:** A background task queuing system that manages massive data operations asynchronously, preventing frontend timeouts during heavy ML workloads.
 
 ---
 
 ## **3. Core Features in Detail**
 
-### **3.1. Secure Authentication & User Dashboard**
-Users are onboarded through a secure login portal using JWT authentication. Post-login, they enter a central **Dashboard** where they can view historical reports, active background jobs, and upload new datasets (CSV/JSON/Excel). The interface prioritizes clarity, displaying progress bars and status indicators for active analysis pipelines.
+### **3.1. Secure Authentication, Credits & Admin Dashboard**
+Users are onboarded through a secure login portal using JWT authentication. 
+- **The Dashboard:** Post-login, they enter a central Dashboard where they can view historical reports, active background jobs, and upload new datasets.
+- **Credits Economy:** The platform operates on a proprietary credit system. Users are seeded with 1,000 credits. Heavy AI operations, such as executing a full ML pipeline or asking chat questions, deduct credits. When credits run low, the API gracefully intercepts with a `402 Payment Required` event, triggering a UI modal for users to request credit top-ups.
+- **Admin Control Panel:** Administrators have access to a protected routing panel where they can dynamically monitor the user base, forcefully edit user credit balances, and approve or reject inbound credit requests.
 
 ### **3.2. Automated Exploratory Data Analysis (EDA)**
 Upon data ingestion, the EDA Engine activates:
@@ -77,7 +80,8 @@ A conversational LLM interface is integrated directly into the report viewer. Th
 | Layer | Technologies |
 | :--- | :--- |
 | **Frontend** | React, Vite, Tailwind CSS, Framer Motion, Lucide React, Axios |
-| **Backend API** | FastAPI, Uvicorn, Python 3.10+, SQLAlchemy, SQLite |
+| **Backend API** | FastAPI, Uvicorn, Python 3.10+, SQLAlchemy |
+| **Database** | Supabase (PostgreSQL), SQLite (Local Fallback) |
 | **Machine Learning** | Pandas, NumPy, Scikit-Learn, FLAML (AutoML) |
 | **Visualization** | Matplotlib, Seaborn, YData Profiling |
 | **AI Integration** | Hugging Face (Mistral), OpenRouter (GPT-4o/OSS), Microsoft AutoGen |
