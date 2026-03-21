@@ -17,3 +17,4 @@ ydata-profiling
 pyautogen
 openai
 httpx
+huggingface_hub
