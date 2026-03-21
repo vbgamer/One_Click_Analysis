@@ -10,7 +10,7 @@ python-jose[cryptography]
 python-multipart
 pandas
 scikit-learn
-flaml
+flaml[automl]
 matplotlib
 seaborn
 ydata-profiling
