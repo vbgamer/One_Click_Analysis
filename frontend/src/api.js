@@ -1,8 +1,12 @@
 import axios from 'axios';
+import safeStorage from './utils/storage';
 
-// Auto-derive backend URL from the current host so it works on localhost AND LAN IP.
+// In dev, call the local FastAPI server on :8000.
+// In production, default to same-origin so PythonAnywhere can serve the React
+// build and API from one domain without an exposed :8000 port.
 const backendHost = window.location.hostname;  // e.g. 'localhost' or '192.168.0.103'
-const backendURL = import.meta.env.VITE_API_URL || `http://${backendHost}:8000`;
+const isDev = import.meta.env.DEV;
+const backendURL = import.meta.env.VITE_API_URL || (isDev ? `http://${backendHost}:8000` : '');
 
 const api = axios.create({
     baseURL: backendURL,
@@ -11,7 +15,7 @@ const api = axios.create({
 // Attach JWT token to every request
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        const token = safeStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -19,6 +23,7 @@ api.interceptors.request.use(
     },
     (error) => Promise.reject(error)
 );
+
 
 // Global response interceptor: handle 402 (out of credits)
 api.interceptors.response.use(

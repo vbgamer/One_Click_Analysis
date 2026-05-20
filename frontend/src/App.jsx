@@ -11,9 +11,11 @@ import AdminDashboard from './pages/AdminDashboard';
 import Landing from './pages/Landing';
 import ChartSelection from './pages/ChartSelection';
 import LayoutBuilder from './pages/LayoutBuilder';
+import safeStorage from './utils/storage';
 
 function App() {
-  const isAuthenticated = !!localStorage.getItem('token'); // Basic auth check
+  const isAuthenticated = !!safeStorage.getItem('token'); // Basic auth check
+
 
   return (
     <BrowserRouter>

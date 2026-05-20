@@ -4,10 +4,14 @@ echo    One Click Analysis - Application Startup
 echo ===============================================
 echo.
 
-:: Start Backend (FastAPI)
+:: Start Backend (FastAPI via manage.py)
 echo [1/2] Starting Backend Server (FastAPI on port 8000)...
 cd /d "%~dp0backend"
-start "Backend - FastAPI" cmd /k "python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+if exist venv\Scripts\activate.bat (
+    start "Backend - FastAPI" cmd /k "call venv\Scripts\activate && python manage.py runserver"
+) else (
+    start "Backend - FastAPI" cmd /k "python manage.py runserver"
+)
 
 :: Wait a moment for backend to initialize
 timeout /t 3 /nobreak > nul

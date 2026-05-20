@@ -215,7 +215,7 @@ def ask_dataset_question(df, query: str):
     Answer a user question about the dataset using OpenRouter API.
     Context includes: Column names, types, and first 5 rows (as CSV).
     """
-    api_key = os.getenv("OPENROUTER_API_KEY", "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")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     
     # Context Building
     csv_head = df.head(5).to_csv(index=False)
@@ -248,6 +248,9 @@ def ask_dataset_question(df, query: str):
     """
     
     try:
+        if not api_key:
+            return _answer_question_offline(df, query)
+
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -270,7 +273,80 @@ def ask_dataset_question(df, query: str):
             result = response.json()
             return result['choices'][0]['message']['content']
         else:
-            return f"Error from AI Provider: {response.text}"
+            return _answer_question_offline(df, query)
             
     except Exception as e:
-        return f"I encountered an error trying to answer that: {str(e)}"
+        return _answer_question_offline(df, query)
+
+
+def _answer_question_offline(df, query: str) -> str:
+    """
+    Temporary zero-dependency fallback for the chat assistant.
+    It answers common analytical questions directly from the dataframe so the UI
+    remains useful even when no external LLM provider is configured.
+    """
+    q = query.lower().strip()
+    rows, cols = df.shape
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+
+    if any(word in q for word in ["how many rows", "number of rows", "row count", "records"]):
+        return f"The dataset has {rows:,} rows and {cols:,} columns."
+
+    if any(word in q for word in ["how many columns", "number of columns", "column count"]):
+        return f"The dataset has {cols:,} columns: {', '.join(map(str, df.columns.tolist()))}."
+
+    if "missing" in q or "null" in q:
+        missing = df.isnull().sum()
+        total_missing = int(missing.sum())
+        if total_missing == 0:
+            return "There are no missing values in this dataset."
+        top_missing = missing[missing > 0].sort_values(ascending=False).head(5)
+        detail = ", ".join(f"{col}: {int(count)}" for col, count in top_missing.items())
+        return f"There are {total_missing:,} missing values in total. The columns with the most missing values are {detail}."
+
+    if "duplicate" in q:
+        dupes = int(df.duplicated().sum())
+        return f"The dataset contains {dupes:,} duplicate rows."
+
+    matched_numeric = next((col for col in numeric_cols if col.lower() in q), None)
+    if matched_numeric:
+        series = df[matched_numeric].dropna()
+        if series.empty:
+            return f"`{matched_numeric}` has no non-null numeric values to summarize."
+        if any(word in q for word in ["average", "mean"]):
+            return f"The average `{matched_numeric}` is {series.mean():,.2f}."
+        if "median" in q:
+            return f"The median `{matched_numeric}` is {series.median():,.2f}."
+        if any(word in q for word in ["highest", "maximum", "max"]):
+            return f"The maximum `{matched_numeric}` is {series.max():,.2f}."
+        if any(word in q for word in ["lowest", "minimum", "min"]):
+            return f"The minimum `{matched_numeric}` is {series.min():,.2f}."
+        return (
+            f"For `{matched_numeric}`, the mean is {series.mean():,.2f}, "
+            f"median is {series.median():,.2f}, minimum is {series.min():,.2f}, "
+            f"and maximum is {series.max():,.2f}."
+        )
+
+    matched_category = next((col for col in categorical_cols if col.lower() in q), None)
+    if matched_category and any(word in q for word in ["top", "most common", "common", "distribution"]):
+        counts = df[matched_category].astype(str).value_counts().head(5)
+        detail = ", ".join(f"{name}: {count:,}" for name, count in counts.items())
+        return f"The top values in `{matched_category}` are {detail}."
+
+    if numeric_cols:
+        stats = []
+        for col in numeric_cols[:4]:
+            series = df[col].dropna()
+            if not series.empty:
+                stats.append(f"{col}: mean {series.mean():,.2f}, min {series.min():,.2f}, max {series.max():,.2f}")
+        summary = "; ".join(stats)
+        return (
+            f"I can answer questions about this dataset locally. It has {rows:,} rows and {cols:,} columns. "
+            f"Key numeric fields include {summary}. Try asking about averages, minimums, maximums, missing values, duplicates, or top categories."
+        )
+
+    return (
+        f"I can answer questions about this dataset locally. It has {rows:,} rows and {cols:,} columns. "
+        f"Try asking about row count, missing values, duplicates, or the most common values in a category."
+    )

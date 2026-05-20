@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { UploadCloud, FileText, AlertCircle } from 'lucide-react';
 import api from '../api';
 import OnboardingTour from '../components/OnboardingTour';
+import safeStorage from '../utils/storage';
 
 const Dashboard = () => {
     const [isDragging, setIsDragging] = useState(false);
@@ -21,7 +22,7 @@ const Dashboard = () => {
                 const userData = response.data;
                 setUser(userData);
 
-                const hasSeenTour = localStorage.getItem(`hasSeenDashboardTour_${userData.id}`);
+                const hasSeenTour = safeStorage.getItem(`hasSeenDashboardTour_${userData.id}`);
                 if (!hasSeenTour) {
                     setShowTour(true);
                 }
@@ -35,9 +36,10 @@ const Dashboard = () => {
     const handleTourComplete = () => {
         setShowTour(false);
         if (user) {
-            localStorage.setItem(`hasSeenDashboardTour_${user.id}`, 'true');
+            safeStorage.setItem(`hasSeenDashboardTour_${user.id}`, 'true');
         }
     };
+
 
     const tourSteps = [
         {

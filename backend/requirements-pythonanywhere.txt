@@ -1,0 +1,30 @@
+fastapi
+a2wsgi
+pydantic
+sqlalchemy
+python-dotenv
+passlib[pbkdf2]
+python-jose[cryptography]
+python-multipart
+pandas
+numpy
+scipy
+scikit-learn
+matplotlib
+seaborn
+openpyxl
+requests
+huggingface_hub
+openai
+httpx
+flaml[automl]
+ydata-profiling
+
+# Optional but heavy. Enable only if your PythonAnywhere plan has enough disk/CPU.
+# pyautogen
+# xgboost
+# lightgbm
+
+# Use only on a paid PythonAnywhere plan or PythonAnywhere-hosted Postgres.
+# Free PythonAnywhere accounts cannot connect to external Postgres services.
+# psycopg2-binary

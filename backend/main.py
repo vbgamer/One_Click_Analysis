@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import uuid
@@ -543,5 +544,23 @@ def recommend_layout(job_id: str, current_user: models.User = Depends(auth.get_c
         })
 
     return {"layout": layout}
+
+
+# --- Production Frontend Hosting ---
+# PythonAnywhere runs one WSGI app. If the Vite production build exists, serve it
+# from FastAPI so the frontend and backend can share one domain.
+frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+frontend_assets = frontend_dist / "assets"
+
+if frontend_dist.exists():
+    if frontend_assets.exists():
+        app.mount("/assets", StaticFiles(directory=str(frontend_assets)), name="frontend-assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_frontend(full_path: str):
+        requested = frontend_dist / full_path
+        if requested.is_file():
+            return FileResponse(requested)
+        return FileResponse(frontend_dist / "index.html")
 
 

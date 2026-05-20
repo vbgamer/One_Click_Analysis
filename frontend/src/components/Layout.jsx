@@ -4,6 +4,7 @@ import { LayoutDashboard, FileText, Settings, LogOut, Menu, User, ShieldCheck } 
 import '../styles/variables.css';
 import api from '../api';
 import CreditModal from './CreditModal';
+import safeStorage from '../utils/storage';
 
 const Layout = () => {
     const navigate = useNavigate();
@@ -27,9 +28,10 @@ const Layout = () => {
     }, []);
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
+        safeStorage.removeItem('token');
         navigate('/login');
     };
+
 
     const navItems = [
         { label: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },

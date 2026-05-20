@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import TermsModal from '../components/TermsModal';
+import safeStorage from '../utils/storage';
 
 const Login = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -26,7 +27,7 @@ const Login = () => {
                 const response = await api.post('/auth/login', params, {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
                 });
-                localStorage.setItem('token', response.data.access_token);
+                safeStorage.setItem('token', response.data.access_token);
                 navigate('/dashboard');
             } else {
                 // Signup
@@ -38,11 +39,12 @@ const Login = () => {
                 const loginResponse = await api.post('/auth/login', params, {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
                 });
-                localStorage.setItem('token', loginResponse.data.access_token);
+                safeStorage.setItem('token', loginResponse.data.access_token);
                 navigate('/dashboard');
             }
         } catch (err) {
             console.error("Auth Exception:", err);
+
 
             if (err.message === 'Network Error') {
                 setError('Network Error: Cannot connect to the backend server. Make sure it is running and CORS is configured.');
