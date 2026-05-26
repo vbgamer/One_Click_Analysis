@@ -15,6 +15,7 @@ from routers import admin as admin_router
 
 # ML Imports
 from ml import etl, eda, automl, viz, reporting, insights
+from ml.expense_intelligence import run_expense_intelligence
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -385,6 +386,36 @@ def get_job_charts(job_id: str, current_user: models.User = Depends(auth.get_cur
         
     with open(metadata_path, 'r') as f:
         return json.load(f)
+
+
+@app.get("/expense-intelligence/{job_id}")
+def get_expense_intelligence(job_id: str, current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
+    """
+    Domain-specific AI layer for expense and financial intelligence.
+
+    Unlike the generic AutoML report, this endpoint performs expense-aware
+    preprocessing, behavioral analysis, forecasting validation, anomaly
+    detection, recommendation generation, and settlement optimization.
+    """
+    job = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not job.filename:
+        raise HTTPException(status_code=400, detail="No file associated with this job")
+
+    file_ext = os.path.splitext(job.filename)[1]
+    file_path = f"static/uploads/{job.id}{file_ext}"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Data file not found on server")
+
+    try:
+        df = etl.load_data(file_path)
+        return run_expense_intelligence(df)
+    except Exception as e:
+        print(f"Expense Intelligence Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate expense intelligence")
 
 @app.post("/reports/{job_id}/custom")
 def generate_custom_report(job_id: str, request: schemas.CustomReportRequest, current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):

@@ -46,8 +46,8 @@ const Login = () => {
             console.error("Auth Exception:", err);
 
 
-            if (err.message === 'Network Error') {
-                setError('Network Error: Cannot connect to the backend server. Make sure it is running and CORS is configured.');
+            if (!err.response) {
+                setError('Cannot connect to the backend server. Please make sure the app server is running, then refresh this page.');
             } else {
                 setError(err.response?.data?.detail || 'Authentication failed. Please check your credentials.');
             }

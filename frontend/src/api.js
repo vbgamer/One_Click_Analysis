@@ -1,12 +1,14 @@
 import axios from 'axios';
 import safeStorage from './utils/storage';
 
-// In dev, call the local FastAPI server on :8000.
-// In production, default to same-origin so PythonAnywhere can serve the React
-// build and API from one domain without an exposed :8000 port.
-const backendHost = window.location.hostname;  // e.g. 'localhost' or '192.168.0.103'
-const isDev = import.meta.env.DEV;
-const backendURL = import.meta.env.VITE_API_URL || (isDev ? `http://${backendHost}:8000` : '');
+// Prefer same-origin API calls.
+//
+// Development: Vite proxies these paths to FastAPI. This avoids browser/CORS
+// failures when the UI is opened through localhost, 127.0.0.1, or a LAN/IP URL.
+// Production: FastAPI serves the Vite build and API from the same domain.
+//
+// Set VITE_API_URL only when the API is intentionally hosted on another domain.
+const backendURL = import.meta.env.VITE_API_URL || '';
 
 const api = axios.create({
     baseURL: backendURL,
