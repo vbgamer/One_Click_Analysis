@@ -2,10 +2,21 @@ services:
   - type: web
     name: one-click-analysis-backend
     env: python
+    region: singapore          # closest to India
+    plan: free
     buildCommand: |
       pip install --upgrade pip
       pip install -r backend/requirements-prod.txt
     startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.12
+        value: "3.11.0"
+      - key: FRONTEND_URL
+        sync: false             # set manually in Render dashboard after Netlify deploy
+      - key: DATABASE_URL
+        sync: false             # set to your PostgreSQL URL in Render dashboard
+      - key: SECRET_KEY
+        generateValue: true     # auto-generated JWT secret
+      - key: OPENAI_API_KEY
+        sync: false             # optional: set if you use OpenAI features
