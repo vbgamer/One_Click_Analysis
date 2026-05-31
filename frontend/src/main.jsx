@@ -1,7 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+import './styles/intelligence.css'
 import App from './App.jsx'
+
 
 // === DEBUG: Global error handler to catch uncaught errors ===
 window.onerror = function (message, source, lineno, colno, error) {

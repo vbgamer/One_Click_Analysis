@@ -87,21 +87,22 @@ const History = () => {
                             </div>
 
                             {job.status === 'done' && (
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                     <button
                                         onClick={(e) => handleDelete(job.id, e)}
                                         className="btn btn-outline"
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.5rem',
-                                            borderColor: '#ef4444',
-                                            color: '#ef4444'
-                                        }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: '#ef4444', color: '#ef4444' }}
                                         title="Delete Report"
                                     >
                                         <Trash2 size={16} />
                                     </button>
+                                    <Link
+                                        to={`/intelligence/${job.id}`}
+                                        className="btn btn-outline"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: '#6366f1', color: '#6366f1' }}
+                                    >
+                                        🧠 AI Analysis
+                                    </Link>
                                     <Link to={`/report/${job.id}`} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         View Report <ArrowRight size={16} />
                                     </Link>

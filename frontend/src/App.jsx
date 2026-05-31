@@ -7,15 +7,15 @@ import ReportView from './pages/ReportView';
 import History from './pages/History';
 import Settings from './pages/Settings';
 import AdminDashboard from './pages/AdminDashboard';
-
 import Landing from './pages/Landing';
 import ChartSelection from './pages/ChartSelection';
 import LayoutBuilder from './pages/LayoutBuilder';
+import Intelligence from './pages/Intelligence';
+import ConversationalAI from './pages/ConversationalAI';
 import safeStorage from './utils/storage';
 
 function App() {
-  const isAuthenticated = !!safeStorage.getItem('token'); // Basic auth check
-
+  const isAuthenticated = !!safeStorage.getItem('token');
 
   return (
     <BrowserRouter>
@@ -24,7 +24,11 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
 
-        {/* Customize Report Flow (outside Layout for full-screen) */}
+        {/* AI Intelligence (full-screen, outside layout) */}
+        <Route path="/intelligence/:jobId" element={<Intelligence />} />
+        <Route path="/chat/:jobId" element={<ConversationalAI />} />
+
+        {/* Customize Report Flow (full-screen) */}
         <Route path="/builder/:jobId" element={<ChartSelection />} />
         <Route path="/builder/:jobId/layout" element={<LayoutBuilder />} />
 
@@ -43,4 +47,3 @@ function App() {
 }
 
 export default App;
-

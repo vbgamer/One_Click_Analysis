@@ -1,673 +1,818 @@
-import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-import seaborn as sns
-import pandas as pd
+"""
+viz.py — Plotly-based interactive chart generator for Expense Intelligence System.
+
+All functions return Plotly figure dicts (JSON-serialisable) using a consistent
+dark theme with primary colour #6366f1 (indigo).
+
+Functions
+---------
+generate_all_charts        : Generate the full chart suite.
+chart_spending_over_time   : Line chart with optional forecast overlay.
+chart_category_breakdown   : Donut/pie chart of category spend.
+chart_payer_comparison     : Bar chart of payer contributions.
+chart_anomaly_heatmap      : Calendar heatmap of anomaly scores.
+chart_forecast             : Area chart with confidence bands.
+chart_spending_heatmap     : Day-of-week × month spending heatmap.
+chart_top_merchants        : Horizontal bar chart of top merchants.
+chart_settlement_flow      : Sankey diagram of payment flows.
+chart_recommendation_impact: Impact bars for recommendations.
+"""
+
+import json
+
 import numpy as np
-import os
-import warnings
-warnings.filterwarnings('ignore')
+import pandas as pd
 
-# Professional color palette
-COLORS = {
-    'primary': '#2563eb',
-    'secondary': '#7c3aed',
-    'success': '#059669',
-    'danger': '#dc2626',
-    'warning': '#d97706',
-    'info': '#0891b2',
-    'gray': '#6b7280',
-    'light_gray': '#e5e7eb',
-    'bg': '#f8fafc',
-}
-PALETTE = ['#2563eb', '#7c3aed', '#059669', '#dc2626', '#d97706', '#0891b2', '#db2777', '#4f46e5']
+# ---------------------------------------------------------------------------
+# Optional: Plotly
+# ---------------------------------------------------------------------------
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    _PLOTLY_AVAILABLE = True
+except ImportError:
+    _PLOTLY_AVAILABLE = False
+
+# ---------------------------------------------------------------------------
+# Design tokens
+# ---------------------------------------------------------------------------
+
+PRIMARY = "#6366f1"       # Indigo
+SECONDARY = "#8b5cf6"     # Violet
+SUCCESS = "#22c55e"       # Green
+DANGER = "#ef4444"        # Red
+WARNING = "#f59e0b"       # Amber
+INFO = "#06b6d4"          # Cyan
+GRAY = "#6b7280"
+BG_COLOR = "#0f172a"      # Slate-900
+SURFACE = "#1e293b"       # Slate-800
+BORDER = "#334155"        # Slate-700
+TEXT_PRIMARY = "#f1f5f9"
+TEXT_SECONDARY = "#94a3b8"
+
+PALETTE = [
+    PRIMARY, SECONDARY, SUCCESS, WARNING, DANGER, INFO,
+    "#f472b6", "#34d399", "#fb923c", "#a78bfa",
+]
+
+_BASE_LAYOUT = dict(
+    paper_bgcolor=BG_COLOR,
+    plot_bgcolor=SURFACE,
+    font=dict(family="Inter, system-ui, sans-serif", color=TEXT_PRIMARY, size=12),
+    title_font=dict(size=16, color=TEXT_PRIMARY, family="Inter, system-ui, sans-serif"),
+    legend=dict(
+        bgcolor="rgba(30,41,59,0.8)",
+        bordercolor=BORDER,
+        borderwidth=1,
+        font=dict(color=TEXT_SECONDARY),
+    ),
+    xaxis=dict(
+        gridcolor=BORDER,
+        linecolor=BORDER,
+        tickcolor=TEXT_SECONDARY,
+        tickfont=dict(color=TEXT_SECONDARY),
+    ),
+    yaxis=dict(
+        gridcolor=BORDER,
+        linecolor=BORDER,
+        tickcolor=TEXT_SECONDARY,
+        tickfont=dict(color=TEXT_SECONDARY),
+    ),
+    margin=dict(l=60, r=30, t=60, b=60),
+)
 
 
-def generate_charts(df: pd.DataFrame, output_dir: str, ml_results: dict = None, eda_stats: dict = None):
+def _make_layout(**overrides) -> dict:
+    """Merge base layout with overrides."""
+    layout = dict(_BASE_LAYOUT)
+    for key, val in overrides.items():
+        if isinstance(val, dict) and key in layout and isinstance(layout[key], dict):
+            layout[key] = {**layout[key], **val}
+        else:
+            layout[key] = val
+    return layout
+
+
+def _empty_chart(message: str = "No data available") -> dict:
+    """Return an empty Plotly figure with a centred message."""
+    if not _PLOTLY_AVAILABLE:
+        return {"data": [], "layout": {"title": {"text": message}}}
+    fig = go.Figure()
+    fig.add_annotation(
+        text=message,
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.5,
+        showarrow=False,
+        font=dict(size=14, color=TEXT_SECONDARY),
+    )
+    fig.update_layout(**_make_layout(title={"text": message}))
+    return json.loads(fig.to_json())
+
+
+def _fig_to_dict(fig) -> dict:
+    """Convert a Plotly figure to a JSON-safe dict."""
+    return json.loads(fig.to_json())
+
+
+def _get_col(df: pd.DataFrame, schema: dict, key: str) -> str | None:
+    col = schema.get(key)
+    return col if col and col in df.columns else None
+
+
+# ---------------------------------------------------------------------------
+# Individual chart functions
+# ---------------------------------------------------------------------------
+
+def chart_spending_over_time(df: pd.DataFrame, schema: dict) -> dict:
+    """Line chart of daily spending with optional forecast overlay.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned expense dataframe.
+    schema : dict
+        Output of ``etl.infer_schema(df)``.
+
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
     """
-    Generate analyst-grade charts with statistical annotations.
-    Uses intelligent chart selection based on data patterns, not just column order.
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
+
+    date_col = _get_col(df, schema, "date_col")
+    amount_col = _get_col(df, schema, "amount_col")
+
+    if not date_col or not amount_col:
+        return _empty_chart("Date or amount column not detected")
+
+    try:
+        ts = df[[date_col, amount_col]].copy()
+        ts[date_col] = pd.to_datetime(ts[date_col], errors="coerce")
+        ts[amount_col] = pd.to_numeric(ts[amount_col], errors="coerce").fillna(0)
+        ts = ts.dropna(subset=[date_col])
+        daily = ts.groupby(ts[date_col].dt.date)[amount_col].sum().reset_index()
+        daily.columns = ["date", "amount"]
+        daily = daily.sort_values("date")
+
+        # 7-day rolling average
+        daily["rolling_avg"] = daily["amount"].rolling(7, min_periods=1).mean()
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Bar(
+                x=daily["date"].astype(str),
+                y=daily["amount"],
+                name="Daily Spend",
+                marker_color=f"rgba(99,102,241,0.4)",
+                marker_line_color=PRIMARY,
+                marker_line_width=0.5,
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=daily["date"].astype(str),
+                y=daily["rolling_avg"],
+                name="7-Day Average",
+                line=dict(color=SECONDARY, width=2.5),
+                mode="lines",
+            )
+        )
+        fig.update_layout(
+            **_make_layout(
+                title={"text": "💸 Daily Spending Over Time"},
+                xaxis={"title": {"text": "Date"}},
+                yaxis={"title": {"text": "Amount (₹)"}},
+                barmode="overlay",
+            )
+        )
+        return _fig_to_dict(fig)
+
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
+
+
+def chart_category_breakdown(df: pd.DataFrame, schema: dict) -> dict:
+    """Donut / pie chart of category spend breakdown.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned expense dataframe.
+    schema : dict
+        Output of ``etl.infer_schema(df)``.
+
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
     """
-    os.makedirs(output_dir, exist_ok=True)
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
 
-    charts = {
-        "Distribution & Data Understanding": [],
-        "Trend & Time-Series Analysis": [],
-        "Comparison & Ranking": [],
-        "Relationship & Correlation": [],
-        "Composition & Proportion": [],
-        "Geographic / Spatial Analysis": [],
-        "KPI & Executive Visuals": [],
-        "Advanced & Business Analysis": [],
-    }
+    category_col = _get_col(df, schema, "category_col")
+    amount_col = _get_col(df, schema, "amount_col")
 
-    # Identify Column Types
-    num_cols = df.select_dtypes(include=['number']).columns.tolist()
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    date_cols = df.select_dtypes(include=['datetime']).columns.tolist()
+    if not category_col:
+        return _empty_chart("Category column not detected")
 
-    # Try to convert object cols to datetime
-    if not date_cols:
-        for col in df.select_dtypes(include=['object']):
-            try:
-                if df[col].nunique() > 10:
-                    temp = pd.to_datetime(df[col], errors='coerce')
-                    if temp.notna().sum() > 0.8 * len(df):
-                        df[col] = temp
-                        date_cols.append(col)
-                        if col in cat_cols:
-                            cat_cols.remove(col)
-            except:
-                pass
-
-    # Get column stats from EDA if available
-    column_stats = {}
-    if eda_stats:
-        column_stats = eda_stats.get('column_stats', {})
-
-    # ====================================================
-    # SMART COLUMN RANKING: Pick most interesting columns
-    # A real analyst looks at variance, skewness, outliers
-    # ====================================================
-    def _rank_numeric_columns(cols):
-        """Rank numeric columns by analytical interest (variance, skewness, outlier %)."""
-        scores = {}
-        for col in cols:
-            score = 0
-            if col in column_stats:
-                cs = column_stats[col]
-                # Higher variance = more interesting
-                cv = cs.get('coefficient_of_variation')
-                if cv and cv > 10:
-                    score += 2
-                # Skewed data = interesting pattern
-                skew = abs(cs.get('skewness', 0))
-                if skew > 1:
-                    score += 3
-                # Has outliers = worth investigating
-                outlier_pct = cs.get('outlier_pct', 0)
-                if outlier_pct > 1:
-                    score += 2
-                # Non-normal = interesting
-                if cs.get('is_normal') is False:
-                    score += 1
-            else:
-                # Fallback: use raw variance
-                score = float(df[col].std()) if df[col].std() > 0 else 0
-            scores[col] = score
-        return sorted(cols, key=lambda c: scores.get(c, 0), reverse=True)
-
-    ranked_num_cols = _rank_numeric_columns(num_cols)
-    # Pick top columns (up to 5 most interesting)
-    top_num_cols = ranked_num_cols[:5]
-
-    plt.style.use('seaborn-v0_8-whitegrid')
-    plt.rcParams.update({
-        'font.size': 11,
-        'axes.titlesize': 13,
-        'axes.titleweight': 'bold',
-        'figure.facecolor': 'white',
-    })
-
-    # ==========================================
-    # 1. Distribution & Data Understanding
-    # ==========================================
-    for col in top_num_cols[:4]:
-        cs = column_stats.get(col, {})
-        skewness = cs.get('skewness', df[col].skew())
-        mean_val = cs.get('mean', df[col].mean())
-        median_val = cs.get('median', df[col].median())
-        outlier_count = cs.get('outlier_count', 0)
-        outlier_pct = cs.get('outlier_pct', 0)
-
-        # --- Histogram with statistical annotations ---
-        fig, ax = plt.subplots(figsize=(9, 5))
-
-        # Use log scale for highly skewed data (analyst technique)
-        use_log = abs(skewness) > 2 and df[col].min() >= 0
-        plot_data = np.log1p(df[col].dropna()) if use_log else df[col].dropna()
-        title_suffix = " (Log Scale)" if use_log else ""
-
-        sns.histplot(plot_data, kde=True, ax=ax, color=COLORS['primary'], alpha=0.7, edgecolor='white')
-
-        # Annotate mean and median lines
-        ax.axvline(plot_data.mean(), color=COLORS['danger'], linestyle='--', linewidth=1.5, label=f'Mean: {mean_val:.2f}')
-        ax.axvline(plot_data.median(), color=COLORS['success'], linestyle='-.', linewidth=1.5, label=f'Median: {median_val:.2f}')
-
-        # Add skewness annotation
-        skew_label = cs.get('skew_interpretation', f'Skew: {skewness:.2f}')
-        ax.text(0.98, 0.95, f'Skewness: {skewness:.2f}\n({skew_label})',
-                transform=ax.transAxes, ha='right', va='top',
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow', edgecolor='gray', alpha=0.8),
-                fontsize=9)
-
-        if outlier_count > 0:
-            ax.text(0.98, 0.78, f'⚠ Outliers: {outlier_count} ({outlier_pct}%)',
-                    transform=ax.transAxes, ha='right', va='top',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor='#fef2f2', edgecolor=COLORS['danger'], alpha=0.8),
-                    fontsize=9, color=COLORS['danger'])
-
-        ax.legend(fontsize=9)
-        ax.set_title(f'Distribution: {col}{title_suffix}')
-        ax.set_xlabel(col)
-        ax.set_ylabel('Frequency')
-        path = save_plot(output_dir, f"hist_{col}.png")
-        charts["Distribution & Data Understanding"].append({"title": f"Distribution - {col}", "path": path})
-
-        # --- Box Plot with outlier annotations ---
-        fig, ax = plt.subplots(figsize=(9, 4))
-        bp = sns.boxplot(x=df[col], ax=ax, color=COLORS['info'], width=0.5)
-
-        # Annotate quartiles
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
-        IQR = Q3 - Q1
-        stats_text = f'Q1: {Q1:.2f} | Median: {median_val:.2f} | Q3: {Q3:.2f}\nIQR: {IQR:.2f} | Outliers: {outlier_count} ({outlier_pct}%)'
-        ax.set_title(f'Box Plot: {col}')
-        ax.text(0.02, 0.95, stats_text, transform=ax.transAxes, ha='left', va='top',
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='gray', alpha=0.9),
-                fontsize=9)
-        path = save_plot(output_dir, f"box_{col}.png")
-        charts["Distribution & Data Understanding"].append({"title": f"Box Plot - {col}", "path": path})
-
-    # ==========================================
-    # 2. Trend & Time-Series Analysis
-    # ==========================================
-    if date_cols:
-        time_col = date_cols[0]
-        
-        # --- Trend: Content / Activity Growth over Time ---
-        # Group by year-month or year depending on data range
-        df_time = df.dropna(subset=[time_col]).copy()
-        
-        # Determine frequency (Yearly if span > 5 years, else Monthly)
-        time_span = (df_time[time_col].max() - df_time[time_col].min()).days
-        if time_span > 1800: # > 5 years
-            df_time['period'] = df_time[time_col].dt.to_period('Y').dt.to_timestamp()
-            period_name = 'Yearly'
+    try:
+        df_work = df.copy()
+        if amount_col:
+            df_work[amount_col] = pd.to_numeric(df_work[amount_col], errors="coerce").fillna(0)
+            cat_totals = df_work.groupby(category_col)[amount_col].sum()
         else:
-            df_time['period'] = df_time[time_col].dt.to_period('M').dt.to_timestamp()
-            period_name = 'Monthly'
-            
-        trend_counts = df_time.groupby('period').size()
-        
-        if len(trend_counts) > 3:
-            fig, ax = plt.subplots(figsize=(11, 6))
-            
-            # Plot bar chart for counts
-            ax.bar(trend_counts.index, trend_counts.values, width=np.timedelta64(20 if period_name=='Monthly' else 300, 'D'), 
-                   color=COLORS['primary'], alpha=0.6, label=f'New Records ({period_name})')
-            
-            # Add cumulative growth line on secondary axis (analyst technique)
-            ax2 = ax.twinx()
-            cum_growth = trend_counts.cumsum()
-            ax2.plot(trend_counts.index, cum_growth.values, color=COLORS['danger'], linewidth=2.5, marker='o', markersize=4, label='Cumulative Growth')
-            
-            ax.set_title(f'Growth Trend Over Time ({time_col})')
-            ax.set_ylabel('New Records')
-            ax2.set_ylabel('Total Cumulative Records')
-            
-            # Ask matplotlib to format dates nicely
-            fig.autofmt_xdate()
-            
-            lines, labels = ax.get_legend_handles_labels()
-            lines2, labels2 = ax2.get_legend_handles_labels()
-            ax2.legend(lines + lines2, labels + labels2, loc='upper left', fontsize=9)
-            
-            path = save_plot(output_dir, f"growth_trend_{time_col}.png")
-            charts["Trend & Time-Series Analysis"].append({"title": f"Growth Trend - {time_col}", "path": path})
+            cat_totals = df_work[category_col].value_counts()
 
-        if num_cols:
-            val_col = ranked_num_cols[0] if ranked_num_cols else num_cols[0]
-            df_sorted = df.sort_values(by=time_col).dropna(subset=[time_col, val_col])
+        cat_totals = cat_totals.sort_values(ascending=False)
 
-            if len(df_sorted) > 5:
-                # --- Line Chart with Moving Average ---
-                fig, ax = plt.subplots(figsize=(11, 6))
-                ax.plot(df_sorted[time_col], df_sorted[val_col], alpha=0.5, color=COLORS['gray'], linewidth=0.8, label=f'Raw {val_col}')
+        # Bucket small categories into "Other"
+        threshold = cat_totals.sum() * 0.02
+        small_mask = cat_totals < threshold
+        if small_mask.sum() > 1:
+            other_total = cat_totals[small_mask].sum()
+            cat_totals = cat_totals[~small_mask]
+            if other_total > 0:
+                cat_totals["Other"] = other_total
 
-                # Moving average (analyst technique for trend detection)
-                window = max(3, len(df_sorted) // 20)
-                ma = df_sorted[val_col].rolling(window=window, center=True).mean()
-                ax.plot(df_sorted[time_col], ma, color=COLORS['secondary'], linewidth=2, label=f'{window}-Point Moving Avg')
-
-                ax.set_title(f'Time Series: {val_col} over Time')
-                ax.legend(fontsize=9)
-                fig.autofmt_xdate()
-                path = save_plot(output_dir, f"line_{val_col}.png")
-                charts["Trend & Time-Series Analysis"].append({"title": f"Time Series - {val_col}", "path": path})
-    else:
-        charts["Trend & Time-Series Analysis"].append({"title": "No suitable time-series data found", "path": None})
-
-    # ==========================================
-    # 3. Comparison & Ranking
-    # ==========================================
-    if cat_cols:
-        # Generate Top 10 charts for up to 4 interesting categorical columns
-        # Sort categoricals by uniqueness: we want high enough uniqueness to be interesting (>2), but not IDs (<1000)
-        valid_cats = [c for c in cat_cols if df[c].nunique() > 2 and df[c].nunique() < 1000]
-        # Sort by number of unique values (ascending)
-        valid_cats = sorted(valid_cats, key=lambda c: df[c].nunique())
-        
-        for cat_col in valid_cats[:4]:
-            if num_cols:
-                val_col = ranked_num_cols[0] if ranked_num_cols else num_cols[0]
-                # Aggregate top categories by mean of the numeric column
-                top_cats = df.groupby(cat_col)[val_col].mean().sort_values(ascending=False).head(10)
-                
-                if len(top_cats) >= 2:
-                    # --- Horizontal Bar for readability (Top 10) ---
-                    fig, ax = plt.subplots(figsize=(10, min(6, max(3, len(top_cats)*0.5))))
-                    sorted_cats = top_cats.sort_values() # Ascending for correct display order
-                    ax.barh(range(len(sorted_cats)), sorted_cats.values, color=COLORS['primary'], edgecolor='white')
-                    ax.set_yticks(range(len(sorted_cats)))
-                    # Shorten labels if too long
-                    labels = [str(l)[:30] + '...' if len(str(l)) > 30 else str(l) for l in sorted_cats.index]
-                    ax.set_yticklabels(labels)
-                    
-                    for i, val in enumerate(sorted_cats.values):
-                        ax.text(val + sorted_cats.values.max() * 0.01, i, f'{val:,.1f}', va='center', fontsize=9)
-                    
-                    ax.set_title(f'Top 10: {cat_col} by Average {val_col}')
-                    ax.set_xlabel(f'Mean {val_col}')
-                    
-                    # Clean filename to avoid special character issues
-                    safe_col = "".join([c if c.isalnum() else "_" for c in cat_col])
-                    path = save_plot(output_dir, f"hbar_mean_{safe_col}.png")
-                    charts["Comparison & Ranking"].append({"title": f"Top 10 {cat_col} (Avg {val_col})", "path": path})
-                    
-            # Also do a volume chart (Top 10 by Count)
-            top_counts = df[cat_col].value_counts().head(10)
-            if len(top_counts) >= 2:
-                fig, ax = plt.subplots(figsize=(10, min(6, max(3, len(top_counts)*0.5))))
-                sorted_counts = top_counts.sort_values()
-                ax.barh(range(len(sorted_counts)), sorted_counts.values, color=COLORS['info'], edgecolor='white')
-                ax.set_yticks(range(len(sorted_counts)))
-                labels = [str(l)[:30] + '...' if len(str(l)) > 30 else str(l) for l in sorted_counts.index]
-                ax.set_yticklabels(labels)
-                
-                for i, val in enumerate(sorted_counts.values):
-                    ax.text(val + sorted_counts.values.max() * 0.01, i, f'{val:,}', va='center', fontsize=9, fontweight='bold')
-                
-                ax.set_title(f'Most Frequent: Top 10 {cat_col} by Volume')
-                ax.set_xlabel('Count / Volume')
-                
-                safe_col = "".join([c if c.isalnum() else "_" for c in cat_col])
-                path = save_plot(output_dir, f"hbar_count_{safe_col}.png")
-                charts["Comparison & Ranking"].append({"title": f"Top 10 by Volume: {cat_col}", "path": path})
-
-    # ==========================================
-    # 4. Relationship & Correlation
-    # ==========================================
-    if len(num_cols) >= 2:
-        # Find the most correlated pair (analyst picks the most interesting relationship)
-        top_corrs = eda_stats.get('top_correlations', []) if eda_stats else []
-        if top_corrs:
-            x_col = top_corrs[0]['col_a']
-            y_col = top_corrs[0]['col_b']
-            corr_val = top_corrs[0]['correlation']
-        else:
-            x_col = num_cols[0]
-            y_col = num_cols[1]
-            corr_val = df[x_col].corr(df[y_col])
-
-        # --- Scatter Plot with regression line and R² ---
-        fig, ax = plt.subplots(figsize=(9, 7))
-        ax.scatter(df[x_col], df[y_col], alpha=0.4, s=20, color=COLORS['primary'], edgecolors='white', linewidth=0.5)
-
-        # Add regression line
-        try:
-            mask = df[[x_col, y_col]].dropna()
-            z = np.polyfit(mask[x_col], mask[y_col], 1)
-            p = np.poly1d(z)
-            x_line = np.linspace(mask[x_col].min(), mask[x_col].max(), 100)
-            ax.plot(x_line, p(x_line), color=COLORS['danger'], linewidth=2, linestyle='--',
-                    label=f'y = {z[0]:.3f}x + {z[1]:.3f}')
-        except:
-            pass
-
-        # Annotate R² and correlation
-        r_sq = corr_val ** 2
-        ax.text(0.02, 0.95, f'r = {corr_val:.3f}\nR² = {r_sq:.3f}',
-                transform=ax.transAxes, ha='left', va='top',
-                bbox=dict(boxstyle='round,pad=0.4', facecolor='lightyellow', edgecolor='gray', alpha=0.9),
-                fontsize=11, fontweight='bold')
-
-        ax.set_title(f'Scatter: {x_col} vs {y_col}')
-        ax.set_xlabel(x_col)
-        ax.set_ylabel(y_col)
-        ax.legend(fontsize=9)
-        path = save_plot(output_dir, f"scatter_{x_col}_{y_col}.png")
-        charts["Relationship & Correlation"].append({"title": f"Scatter - {x_col} vs {y_col}", "path": path})
-
-        # --- Correlation Heatmap with significance ---
-        fig, ax = plt.subplots(figsize=(10, 8))
-        corr = df[num_cols].corr()
-        mask = np.triu(np.ones_like(corr, dtype=bool), k=1)
-        sns.heatmap(corr, mask=mask, annot=True, cmap='RdBu_r', center=0, fmt=".2f",
-                    ax=ax, vmin=-1, vmax=1, linewidths=0.5, square=True,
-                    cbar_kws={'label': 'Correlation Coefficient'})
-        ax.set_title('Correlation Matrix (Lower Triangle)')
-        path = save_plot(output_dir, "heatmap_corr.png")
-        charts["Relationship & Correlation"].append({"title": "Correlation Matrix", "path": path})
-
-        # --- Pair Plot for top 4 columns ---
-        try:
-            subset_cols = ranked_num_cols[:4]
-            if len(subset_cols) >= 2:
-                pp = sns.pairplot(df[subset_cols], diag_kind='kde',
-                                  plot_kws={'alpha': 0.4, 's': 15, 'edgecolor': 'white'},
-                                  diag_kws={'fill': True})
-                pp.fig.suptitle('Pair Plot (Top Interesting Columns)', y=1.02, fontweight='bold')
-                path = os.path.join(output_dir, "pairplot.png")
-                pp.savefig(path, bbox_inches='tight')
-                plt.close()
-                charts["Relationship & Correlation"].append({"title": "Pair Plot", "path": "pairplot.png"})
-        except:
-            pass
-
-    # ==========================================
-    # 5. Composition & Proportion
-    # ==========================================
-    if cat_cols:
-        cat_col = min(cat_cols, key=lambda c: df[c].nunique()) if cat_cols else cat_cols[0]
-        vc = df[cat_col].value_counts()
-
-        # "Others" bucket for clean charts (analyst technique)
-        if len(vc) > 6:
-            top_vc = vc.head(5)
-            others = pd.Series({'Others': vc.iloc[5:].sum()})
-            vc_display = pd.concat([top_vc, others])
-        else:
-            vc_display = vc
-
-        # --- Donut Chart (more modern than pie) ---
-        fig, ax = plt.subplots(figsize=(8, 8))
-        colors = PALETTE[:len(vc_display)]
-        wedges, texts, autotexts = ax.pie(
-            vc_display.values, labels=vc_display.index, autopct='%1.1f%%',
-            wedgeprops=dict(width=0.4, edgecolor='white', linewidth=2),
-            colors=colors, pctdistance=0.8
+        fig = go.Figure(
+            go.Pie(
+                labels=cat_totals.index.tolist(),
+                values=[round(float(v), 2) for v in cat_totals.values],
+                hole=0.45,
+                marker=dict(
+                    colors=PALETTE[: len(cat_totals)],
+                    line=dict(color=BG_COLOR, width=2),
+                ),
+                textfont=dict(color=TEXT_PRIMARY, size=11),
+                hovertemplate="<b>%{label}</b><br>₹%{value:,.0f}<br>%{percent}<extra></extra>",
+            )
         )
-        for autotext in autotexts:
-            autotext.set_fontsize(9)
-            autotext.set_fontweight('bold')
-        ax.set_title(f'Composition: {cat_col}')
-        # Add total count in center
-        ax.text(0, 0, f'Total\n{len(df):,}', ha='center', va='center', fontsize=14, fontweight='bold',
-                color=COLORS['gray'])
-        path = save_plot(output_dir, f"donut_{cat_col}.png")
-        charts["Composition & Proportion"].append({"title": f"Composition - {cat_col}", "path": path})
+        fig.update_layout(
+            **_make_layout(
+                title={"text": "🏷 Spending by Category"},
+                showlegend=True,
+            )
+        )
+        return _fig_to_dict(fig)
 
-        # --- Stacked bar if 2 categoricals ---
-        if len(cat_cols) > 1 and len(num_cols) > 0:
-            cat_col_2 = [c for c in cat_cols if c != cat_col][0]
-            if df[cat_col].nunique() < 15 and df[cat_col_2].nunique() < 15:
-                try:
-                    ct = pd.crosstab(df[cat_col], df[cat_col_2]).head(10)
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    ct.plot(kind='bar', stacked=True, ax=ax, color=PALETTE[:ct.shape[1]], edgecolor='white')
-                    ax.set_title(f'Stacked Bar: {cat_col} by {cat_col_2}')
-                    ax.legend(title=cat_col_2, bbox_to_anchor=(1.05, 1), loc='upper left')
-                    path = save_plot(output_dir, "stacked_bar.png")
-                    charts["Composition & Proportion"].append({"title": "Stacked Bar Chart", "path": path})
-                except:
-                    pass
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
 
-    # ==========================================
-    # 6. Geographic / Spatial Analysis
-    # ==========================================
-    geo_cols = [c for c in df.columns if 'lat' in c.lower() or 'lon' in c.lower() or 'country' in c.lower()]
-    if geo_cols and len(num_cols) > 0:
-        charts["Geographic / Spatial Analysis"].append({"title": "Geographic analysis requires map library (folium)", "path": None})
-    else:
-        charts["Geographic / Spatial Analysis"].append({"title": "No geographic data detected", "path": None})
 
-    # ==========================================
-    # 7. KPI & Executive Visuals
-    # ==========================================
-    # Total Records KPI
-    charts["KPI & Executive Visuals"].append(
-        generate_kpi_card(output_dir, "Total Records", f"{len(df):,}", "kpi_rows.png")
-    )
+def chart_payer_comparison(df: pd.DataFrame, schema: dict) -> dict:
+    """Grouped bar chart comparing payer contributions.
 
-    # Missing Data KPI
-    missing_pct = eda_stats.get('missing_pct', 0) if eda_stats else round(df.isnull().sum().sum() / (len(df) * len(df.columns)) * 100, 1)
-    color = COLORS['success'] if missing_pct < 5 else COLORS['warning'] if missing_pct < 20 else COLORS['danger']
-    charts["KPI & Executive Visuals"].append(
-        generate_kpi_card(output_dir, "Missing Data", f"{missing_pct}%", "kpi_missing.png", color=color)
-    )
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned expense dataframe.
+    schema : dict
+        Output of ``etl.infer_schema(df)``.
 
-    # Duplicate Rows KPI
-    dup_pct = eda_stats.get('duplicate_pct', 0) if eda_stats else round(df.duplicated().sum() / len(df) * 100, 1)
-    color = COLORS['success'] if dup_pct < 1 else COLORS['warning'] if dup_pct < 10 else COLORS['danger']
-    charts["KPI & Executive Visuals"].append(
-        generate_kpi_card(output_dir, "Duplicate Rows", f"{dup_pct}%", "kpi_duplicates.png", color=color)
-    )
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
+    """
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
 
-    if num_cols:
-        col = ranked_num_cols[0] if ranked_num_cols else num_cols[0]
-        charts["KPI & Executive Visuals"].append(
-            generate_kpi_card(output_dir, f"Mean {col}", f"{df[col].mean():,.2f}", f"kpi_mean_{col}.png")
+    payer_col = _get_col(df, schema, "payer_col")
+    amount_col = _get_col(df, schema, "amount_col")
+
+    if not payer_col:
+        return _empty_chart("Payer column not detected")
+
+    try:
+        df_work = df.copy()
+        if amount_col:
+            df_work[amount_col] = pd.to_numeric(df_work[amount_col], errors="coerce").fillna(0)
+            payer_stats = df_work.groupby(payer_col)[amount_col].agg(
+                ["sum", "mean", "count"]
+            ).reset_index()
+        else:
+            payer_stats = df_work.groupby(payer_col).size().reset_index(name="count")
+            payer_stats["sum"] = payer_stats["count"]
+            payer_stats["mean"] = payer_stats["count"]
+
+        payer_stats = payer_stats.sort_values("sum", ascending=False)
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Bar(
+                x=payer_stats[payer_col].astype(str).tolist(),
+                y=[round(float(v), 2) for v in payer_stats["sum"]],
+                name="Total Paid",
+                marker_color=PRIMARY,
+                text=[f"₹{v:,.0f}" for v in payer_stats["sum"]],
+                textposition="outside",
+                textfont=dict(color=TEXT_PRIMARY, size=10),
+                hovertemplate="<b>%{x}</b><br>Total: ₹%{y:,.0f}<extra></extra>",
+            )
+        )
+        if "mean" in payer_stats.columns:
+            fig.add_trace(
+                go.Bar(
+                    x=payer_stats[payer_col].astype(str).tolist(),
+                    y=[round(float(v), 2) for v in payer_stats["mean"]],
+                    name="Avg Transaction",
+                    marker_color=SECONDARY,
+                    hovertemplate="<b>%{x}</b><br>Avg: ₹%{y:,.0f}<extra></extra>",
+                )
+            )
+        fig.update_layout(
+            **_make_layout(
+                title={"text": "👥 Payer Contribution Comparison"},
+                xaxis={"title": {"text": "Payer"}},
+                yaxis={"title": {"text": "Amount (₹)"}},
+                barmode="group",
+            )
+        )
+        return _fig_to_dict(fig)
+
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
+
+
+def chart_anomaly_heatmap(df: pd.DataFrame, anomalies: dict, schema: dict) -> dict:
+    """Scatter/timeline heatmap of anomaly scores.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned expense dataframe.
+    anomalies : dict
+        Output of ``anomaly.detect_anomalies``.
+    schema : dict
+        Output of ``etl.infer_schema(df)``.
+
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
+    """
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
+
+    if not anomalies or not anomalies.get("available"):
+        return _empty_chart("No anomaly data available")
+
+    try:
+        heatmap_data = anomalies.get("plotly_heatmap_data", {})
+        x = heatmap_data.get("x", [])
+        y = heatmap_data.get("y", [])
+        texts = heatmap_data.get("text", [])
+
+        if not x:
+            return _empty_chart("No anomalies detected")
+
+        colors = [DANGER if s >= 0.7 else WARNING if s >= 0.4 else INFO for s in y]
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=x,
+                y=y,
+                mode="markers",
+                marker=dict(
+                    color=y,
+                    colorscale=[[0, INFO], [0.4, WARNING], [1.0, DANGER]],
+                    size=12,
+                    colorbar=dict(
+                        title="Anomaly Score",
+                        tickfont=dict(color=TEXT_SECONDARY),
+                        titlefont=dict(color=TEXT_SECONDARY),
+                    ),
+                    line=dict(width=1, color=BG_COLOR),
+                ),
+                text=texts,
+                hovertemplate="<b>Date:</b> %{x}<br><b>Score:</b> %{y:.2f}<br>%{text}<extra></extra>",
+            )
+        )
+        fig.update_layout(
+            **_make_layout(
+                title={"text": "🚨 Anomaly Detection Timeline"},
+                xaxis={"title": {"text": "Date"}},
+                yaxis={"title": {"text": "Anomaly Score (0-1)"}, "range": [0, 1.05]},
+            )
+        )
+        return _fig_to_dict(fig)
+
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
+
+
+def chart_forecast(forecast_data: dict) -> dict:
+    """Area chart with confidence bands for spending forecast.
+
+    Parameters
+    ----------
+    forecast_data : dict
+        Output of ``forecasting.forecast_expenses``.
+
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
+    """
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
+
+    if not forecast_data or not forecast_data.get("available"):
+        return _empty_chart("No forecast data available")
+
+    try:
+        plotly_data = forecast_data.get("plotly_data", {})
+        hist_x = plotly_data.get("historical_x", [])
+        hist_y = plotly_data.get("historical_y", [])
+        fc_x = plotly_data.get("forecast_x", [])
+        fc_y = plotly_data.get("forecast_y", [])
+        fc_lower = plotly_data.get("forecast_lower", [])
+        fc_upper = plotly_data.get("forecast_upper", [])
+
+        fig = go.Figure()
+
+        # Historical
+        if hist_x:
+            fig.add_trace(
+                go.Scatter(
+                    x=hist_x,
+                    y=hist_y,
+                    name="Historical",
+                    line=dict(color=INFO, width=2),
+                    mode="lines",
+                )
+            )
+
+        # Confidence band (upper → lower filled)
+        if fc_x:
+            fig.add_trace(
+                go.Scatter(
+                    x=fc_x + fc_x[::-1],
+                    y=fc_upper + fc_lower[::-1],
+                    fill="toself",
+                    fillcolor=f"rgba(99,102,241,0.15)",
+                    line=dict(color="rgba(0,0,0,0)"),
+                    name="95% Confidence",
+                    showlegend=True,
+                )
+            )
+            # Forecast line
+            fig.add_trace(
+                go.Scatter(
+                    x=fc_x,
+                    y=fc_y,
+                    name="Forecast",
+                    line=dict(color=PRIMARY, width=2.5, dash="dot"),
+                    mode="lines",
+                )
+            )
+
+        trend = forecast_data.get("trend_direction", "stable")
+        next_pred = forecast_data.get("next_month_prediction", 0)
+        fig.update_layout(
+            **_make_layout(
+                title={
+                    "text": f"📈 Spending Forecast — Trend: {trend.title()} | Next 30 days: ₹{next_pred:,.0f}"
+                },
+                xaxis={"title": {"text": "Date"}},
+                yaxis={"title": {"text": "Amount (₹)"}},
+            )
+        )
+        return _fig_to_dict(fig)
+
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
+
+
+def chart_spending_heatmap(df: pd.DataFrame, schema: dict) -> dict:
+    """Day-of-week × month spending heatmap.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned expense dataframe.
+    schema : dict
+        Output of ``etl.infer_schema(df)``.
+
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
+    """
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
+
+    date_col = _get_col(df, schema, "date_col")
+    amount_col = _get_col(df, schema, "amount_col")
+
+    if not date_col or not amount_col:
+        return _empty_chart("Date or amount column not detected")
+
+    try:
+        df_work = df.copy()
+        df_work[date_col] = pd.to_datetime(df_work[date_col], errors="coerce")
+        df_work[amount_col] = pd.to_numeric(df_work[amount_col], errors="coerce").fillna(0)
+        df_work = df_work.dropna(subset=[date_col])
+
+        df_work["_dow"] = df_work[date_col].dt.day_name()
+        df_work["_month"] = df_work[date_col].dt.month_name()
+
+        dow_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        month_order = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ]
+
+        pivot = df_work.pivot_table(
+            index="_dow", columns="_month", values=amount_col, aggfunc="mean"
+        )
+        pivot = pivot.reindex(
+            index=[d for d in dow_order if d in pivot.index],
+            columns=[m for m in month_order if m in pivot.columns],
         )
 
-    # ==========================================
-    # 8. Advanced & Business Analysis
-    # ==========================================
+        fig = go.Figure(
+            go.Heatmap(
+                z=pivot.values.tolist(),
+                x=pivot.columns.tolist(),
+                y=pivot.index.tolist(),
+                colorscale=[
+                    [0, SURFACE],
+                    [0.5, SECONDARY],
+                    [1.0, DANGER],
+                ],
+                hoverongaps=False,
+                hovertemplate="<b>%{y}, %{x}</b><br>Avg: ₹%{z:,.0f}<extra></extra>",
+                colorbar=dict(
+                    title="Avg Spend (₹)",
+                    tickfont=dict(color=TEXT_SECONDARY),
+                    titlefont=dict(color=TEXT_SECONDARY),
+                ),
+            )
+        )
+        fig.update_layout(
+            **_make_layout(
+                title={"text": "🗓 Spending Heatmap — Day of Week × Month"},
+                xaxis={"title": {"text": "Month"}},
+                yaxis={"title": {"text": "Day of Week"}},
+            )
+        )
+        return _fig_to_dict(fig)
 
-    # --- Feature Importance Chart (from AutoML) ---
-    if ml_results and ml_results.get('feature_importance'):
-        feat_imp = ml_results['feature_importance']
-        if feat_imp:
-            fig, ax = plt.subplots(figsize=(10, max(4, len(feat_imp) * 0.4)))
-            sorted_feats = dict(sorted(feat_imp.items(), key=lambda x: x[1]))
-            top_feats = dict(list(sorted_feats.items())[-15:])  # Top 15
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
 
-            colors_list = [COLORS['primary'] if v > 0.05 else COLORS['light_gray'] for v in top_feats.values()]
-            ax.barh(list(top_feats.keys()), list(top_feats.values()), color=colors_list, edgecolor='white')
-            for i, (name, val) in enumerate(top_feats.items()):
-                ax.text(val + 0.002, i, f'{val:.3f}', va='center', fontsize=9)
-            ax.set_title(f'Feature Importance ({ml_results.get("best_model", "Model")})')
-            ax.set_xlabel('Importance Score')
-            path = save_plot(output_dir, "feature_importance.png")
-            charts["Advanced & Business Analysis"].append({"title": "Feature Importance", "path": path})
 
-    # --- Class Distribution Chart (for classification) ---
-    if ml_results and ml_results.get('class_info', {}).get('class_distribution'):
-        class_dist = ml_results['class_info']['class_distribution']
-        is_imbalanced = ml_results['class_info'].get('is_imbalanced', False)
+def chart_top_merchants(df: pd.DataFrame, schema: dict, n: int = 10) -> dict:
+    """Horizontal bar chart of top *n* merchants by total spend.
 
-        fig, ax = plt.subplots(figsize=(8, 5))
-        labels = list(class_dist.keys())
-        values = list(class_dist.values())
-        bar_colors = [COLORS['danger'] if is_imbalanced else COLORS['primary']] * len(labels)
-        ax.bar(labels, values, color=bar_colors, edgecolor='white')
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned expense dataframe.
+    schema : dict
+        Output of ``etl.infer_schema(df)``.
+    n : int
+        Number of merchants to display.
 
-        for i, val in enumerate(values):
-            ax.text(i, val + max(values) * 0.01, f'{val:,}', ha='center', fontweight='bold', fontsize=10)
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
+    """
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
 
-        title = f'Target Class Distribution'
-        if is_imbalanced:
-            ratio = ml_results['class_info'].get('imbalance_ratio', 0)
-            title += f' (⚠ IMBALANCED - ratio {ratio:.1f}:1)'
-            ax.text(0.5, 0.95, '⚠ Class imbalance detected!\nConsider SMOTE or class weights.',
-                    transform=ax.transAxes, ha='center', va='top',
-                    bbox=dict(boxstyle='round', facecolor='#fef2f2', edgecolor=COLORS['danger']),
-                    fontsize=9, color=COLORS['danger'])
-        ax.set_title(title)
-        ax.set_ylabel('Count')
-        path = save_plot(output_dir, "class_distribution.png")
-        charts["Advanced & Business Analysis"].append({"title": "Class Distribution", "path": path})
+    merchant_col = _get_col(df, schema, "merchant_col")
+    amount_col = _get_col(df, schema, "amount_col")
 
-    # --- Confusion Matrix Heatmap ---
-    if ml_results and ml_results.get('metrics', {}).get('confusion_matrix'):
-        cm = np.array(ml_results['metrics']['confusion_matrix'])
-        fig, ax = plt.subplots(figsize=(7, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax, cbar=False,
-                    linewidths=1, linecolor='white', square=True)
-        ax.set_title('Confusion Matrix')
-        ax.set_xlabel('Predicted')
-        ax.set_ylabel('Actual')
-        path = save_plot(output_dir, "confusion_matrix.png")
-        charts["Advanced & Business Analysis"].append({"title": "Confusion Matrix", "path": path})
+    if not merchant_col:
+        return _empty_chart("Merchant column not detected")
 
-    # --- Model Metrics Summary Card ---
-    if ml_results and ml_results.get('metrics'):
-        metrics = ml_results['metrics']
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.axis('off')
+    try:
+        df_work = df.copy()
+        if amount_col:
+            df_work[amount_col] = pd.to_numeric(df_work[amount_col], errors="coerce").fillna(0)
+            top = (
+                df_work.groupby(merchant_col)[amount_col]
+                .sum()
+                .sort_values(ascending=False)
+                .head(n)
+                .sort_values(ascending=True)  # ascending for horizontal bar readability
+            )
+        else:
+            top = (
+                df_work[merchant_col]
+                .value_counts()
+                .head(n)
+                .sort_values(ascending=True)
+            )
 
-        # Build metrics text
-        metric_lines = []
-        for key in ['accuracy', 'precision', 'recall', 'f1_score', 'r2', 'rmse', 'mae']:
-            if key in metrics:
-                display_name = key.replace('_', ' ').title()
-                val = metrics[key]
-                if isinstance(val, float) and val <= 1:
-                    metric_lines.append(f'{display_name}: {val:.4f} ({val * 100:.1f}%)')
-                else:
-                    metric_lines.append(f'{display_name}: {val}')
+        fig = go.Figure(
+            go.Bar(
+                x=[round(float(v), 2) for v in top.values],
+                y=[str(m)[:30] for m in top.index],
+                orientation="h",
+                marker=dict(
+                    color=list(range(len(top))),
+                    colorscale=[[0, SECONDARY], [1.0, PRIMARY]],
+                    line=dict(color=BG_COLOR, width=1),
+                ),
+                text=[f"₹{v:,.0f}" for v in top.values],
+                textposition="outside",
+                textfont=dict(color=TEXT_PRIMARY, size=10),
+                hovertemplate="<b>%{y}</b><br>Total: ₹%{x:,.0f}<extra></extra>",
+            )
+        )
+        fig.update_layout(
+            **_make_layout(
+                title={"text": f"🏪 Top {n} Merchants by Spend"},
+                xaxis={"title": {"text": "Total Spend (₹)"}},
+                yaxis={"title": {"text": "Merchant"}},
+                height=max(350, n * 42),
+            )
+        )
+        return _fig_to_dict(fig)
 
-        if 'cv_mean' in metrics:
-            metric_lines.append(f'Cross-Val Mean: {metrics["cv_mean"]:.4f} ± {metrics.get("cv_std", 0):.4f}')
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
 
-        text = '\n'.join(metric_lines)
-        ax.text(0.5, 0.5, text, ha='center', va='center', fontsize=13,
-                fontfamily='monospace', linespacing=1.8,
-                bbox=dict(boxstyle='round,pad=0.8', facecolor=COLORS['bg'], edgecolor=COLORS['primary'], linewidth=2))
-        ax.set_title(f'Model Performance: {ml_results.get("best_model", "AutoML")}', fontsize=14, fontweight='bold', pad=20)
-        path = save_plot(output_dir, "model_metrics.png")
-        charts["Advanced & Business Analysis"].append({"title": "Model Performance Summary", "path": path})
 
-    # --- ROC Curve (for Classification) ---
-    if ml_results and ml_results.get('metrics', {}).get('roc_curve'):
-        try:
-            roc_data = ml_results['metrics']['roc_curve']
-            roc_auc = ml_results['metrics'].get('roc_auc', 0)
-            
-            fig, ax = plt.subplots(figsize=(7, 6))
-            ax.plot(roc_data['fpr'], roc_data['tpr'], color=COLORS['info'], linewidth=3, 
-                    label=f'AUC = {roc_auc:.4f}')
-            ax.plot([0, 1], [0, 1], color=COLORS['gray'], linestyle='--', linewidth=1.5, label='Random Guess')
-            
-            ax.set_title('ROC Curve')
-            ax.set_xlabel('False Positive Rate')
-            ax.set_ylabel('True Positive Rate')
-            ax.set_xlim([0.0, 1.05])
-            ax.set_ylim([0.0, 1.05])
-            ax.legend(loc="lower right", fontsize=11)
-            
-            path = save_plot(output_dir, "roc_curve.png")
-            charts["Advanced & Business Analysis"].append({"title": "ROC Curve", "path": path})
-        except:
-            pass
-            
-    # --- Model Comparison Chart ---
-    if ml_results and ml_results.get('models_compared') and len(ml_results['models_compared']) > 1:
-        try:
-            models = ml_results['models_compared']
-            # We don't have individual scores easily accessible without retraining, 
-            # so we just show the models explored and highlight the winner
-            fig, ax = plt.subplots(figsize=(8, len(models) * 0.6 + 2))
-            
-            best_model = ml_results.get('best_model', '')
-            # Try to get best_model name string since it might be an estimator object
-            if hasattr(best_model, '__class__'):
-                best_model_name = best_model.__class__.__name__
-            else:
-                best_model_name = str(best_model)
-                
-            y_pos = np.arange(len(models))
-            
-            # Simple visualization of explored models
-            colors = [COLORS['success'] if best_model_name.lower() in str(m).lower() or str(m).lower() in best_model_name.lower() else COLORS['light_gray'] for m in models]
-            
-            ax.barh(y_pos, [1]*len(models), align='center', color=colors, edgecolor='white')
-            ax.set_yticks(y_pos)
-            # Shorten names for display
-            display_names = [str(m).split('.')[-1].replace("Classifier", "").replace("Regressor", "") for m in models]
-            ax.set_yticklabels(display_names)
-            ax.invert_yaxis()  # labels read top-to-bottom
-            
-            ax.set_xticks([]) # Hide x axis
-            ax.set_title('Models Evaluated by AutoML (Winner in Green)')
-            
-            path = save_plot(output_dir, "model_comparison.png")
-            charts["Advanced & Business Analysis"].append({"title": "Models Explored", "path": path})
-        except Exception as e:
-            print(f"Error making model comparison: {e}")
-            pass
+def chart_settlement_flow(payer_network: dict) -> dict:
+    """Sankey diagram of optimal payment flows.
 
-    # --- Pareto Chart ---
-    if len(cat_cols) > 0 and len(num_cols) > 0:
-        cat_col = cat_cols[0]
-        val_col = ranked_num_cols[0] if ranked_num_cols else num_cols[0]
-        top_cats = df.groupby(cat_col)[val_col].sum().sort_values(ascending=False).head(8)
+    Parameters
+    ----------
+    payer_network : dict
+        Output of ``settlement.build_payer_network``.
 
-        if len(top_cats) >= 3:
-            try:
-                fig, ax = plt.subplots(figsize=(10, 6))
-                ax.bar(range(len(top_cats)), top_cats.values, color=COLORS['primary'], edgecolor='white')
-                ax.set_xticks(range(len(top_cats)))
-                ax.set_xticklabels(top_cats.index, rotation=45, ha='right')
-                ax.set_ylabel(val_col, color=COLORS['primary'])
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
+    """
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
 
-                # Cumulative line on twin axis
-                ax2 = ax.twinx()
-                cum_pct = top_cats.cumsum() / top_cats.sum() * 100
-                ax2.plot(range(len(top_cats)), cum_pct.values, color=COLORS['danger'], marker='o', ms=6, linewidth=2)
-                ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x)}%'))
-                ax2.set_ylabel('Cumulative %', color=COLORS['danger'])
-                ax2.axhline(80, color=COLORS['warning'], linestyle=':', alpha=0.5, label='80% threshold')
+    if not payer_network or not payer_network.get("available"):
+        return _empty_chart("No settlement network data available")
 
-                ax.set_title(f'Pareto Analysis: {val_col} by {cat_col}')
-                ax2.legend(fontsize=9)
-                path = save_plot(output_dir, f"pareto_{val_col}.png")
-                charts["Advanced & Business Analysis"].append({"title": f"Pareto - {cat_col}", "path": path})
-            except:
-                pass
+    try:
+        nodes = payer_network.get("nodes", [])
+        edges = payer_network.get("edges", [])
 
-    # --- Outlier Summary Chart ---
-    if column_stats:
-        outlier_cols = {col: stats['outlier_pct'] for col, stats in column_stats.items()
-                        if stats.get('outlier_pct', 0) > 0}
-        if outlier_cols:
-            fig, ax = plt.subplots(figsize=(9, max(3, len(outlier_cols) * 0.4)))
-            sorted_outliers = dict(sorted(outlier_cols.items(), key=lambda x: x[1]))
-            colors_list = [COLORS['danger'] if v > 5 else COLORS['warning'] if v > 1 else COLORS['success']
-                           for v in sorted_outliers.values()]
-            ax.barh(list(sorted_outliers.keys()), list(sorted_outliers.values()), color=colors_list, edgecolor='white')
-            for i, (name, val) in enumerate(sorted_outliers.items()):
-                ax.text(val + 0.1, i, f'{val}%', va='center', fontsize=9, fontweight='bold')
-            ax.set_title('Outlier Percentage by Column')
-            ax.set_xlabel('Outlier %')
-            ax.axvline(5, color=COLORS['danger'], linestyle=':', alpha=0.5, label='5% threshold')
-            ax.legend(fontsize=9)
-            path = save_plot(output_dir, "outlier_summary.png")
-            charts["Advanced & Business Analysis"].append({"title": "Outlier Analysis", "path": path})
+        if not nodes or not edges:
+            return _empty_chart("No settlement transactions required — all even!")
 
-    plt.close('all')
+        node_labels = [n["label"] for n in nodes]
+        node_index = {n["id"]: i for i, n in enumerate(nodes)}
+
+        source_indices = [node_index.get(e["source"], 0) for e in edges]
+        target_indices = [node_index.get(e["target"], 0) for e in edges]
+        values = [round(float(e["amount"]), 2) for e in edges]
+
+        fig = go.Figure(
+            go.Sankey(
+                node=dict(
+                    pad=20,
+                    thickness=25,
+                    line=dict(color=BORDER, width=0.5),
+                    label=node_labels,
+                    color=PALETTE[: len(node_labels)],
+                    hovertemplate="<b>%{label}</b><br>Total flow: ₹%{value:,.0f}<extra></extra>",
+                ),
+                link=dict(
+                    source=source_indices,
+                    target=target_indices,
+                    value=values,
+                    color=[f"rgba(99,102,241,0.35)"] * len(values),
+                    hovertemplate=(
+                        "<b>%{source.label}</b> → <b>%{target.label}</b>"
+                        "<br>₹%{value:,.0f}<extra></extra>"
+                    ),
+                ),
+            )
+        )
+        fig.update_layout(
+            **_make_layout(title={"text": "💱 Settlement Flow — Optimal Payment Plan"})
+        )
+        return _fig_to_dict(fig)
+
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
+
+
+def chart_recommendation_impact(recommendations: list) -> dict:
+    """Horizontal bar chart visualising recommendation priorities.
+
+    Parameters
+    ----------
+    recommendations : list
+        Output of ``recommendations.generate_recommendations``.
+
+    Returns
+    -------
+    dict
+        Plotly figure JSON.
+    """
+    if not _PLOTLY_AVAILABLE:
+        return _empty_chart("Plotly not installed")
+
+    if not recommendations:
+        return _empty_chart("No recommendations available")
+
+    try:
+        priority_map = {"high": 3, "medium": 2, "low": 1}
+        color_map = {"high": DANGER, "medium": WARNING, "low": SUCCESS}
+
+        recs = recommendations[:8]  # Top 8
+        titles = [r.get("title", f"Rec {i+1}")[:45] for i, r in enumerate(recs)]
+        confidence = [round(float(r.get("confidence", 0.5)) * 100, 1) for r in recs]
+        priorities = [r.get("priority", "low") for r in recs]
+        colors = [color_map.get(p, GRAY) for p in priorities]
+        priority_scores = [priority_map.get(p, 1) for p in priorities]
+
+        # Sort by priority descending
+        order = sorted(range(len(recs)), key=lambda i: priority_scores[i])
+        titles = [titles[i] for i in order]
+        confidence = [confidence[i] for i in order]
+        colors = [colors[i] for i in order]
+
+        fig = go.Figure(
+            go.Bar(
+                x=confidence,
+                y=titles,
+                orientation="h",
+                marker_color=colors,
+                text=[f"{c:.0f}%" for c in confidence],
+                textposition="outside",
+                textfont=dict(color=TEXT_PRIMARY, size=10),
+                hovertemplate="<b>%{y}</b><br>Confidence: %{x:.1f}%<extra></extra>",
+            )
+        )
+        fig.update_layout(
+            **_make_layout(
+                title={"text": "💡 Recommendations — Confidence & Priority"},
+                xaxis={"title": {"text": "Confidence (%)"}, "range": [0, 115]},
+                yaxis={"title": {"text": ""}},
+                height=max(300, len(recs) * 52),
+            )
+        )
+        return _fig_to_dict(fig)
+
+    except Exception as e:
+        return _empty_chart(f"Error generating chart: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Master function
+# ---------------------------------------------------------------------------
+
+def generate_all_charts(
+    df: pd.DataFrame,
+    schema: dict,
+    analysis_results: dict,
+) -> dict:
+    """Generate the complete interactive chart suite for the expense data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned expense dataframe.
+    schema : dict
+        Output of ``etl.infer_schema(df)``.
+    analysis_results : dict
+        Aggregated pipeline output (contains forecast, anomalies, etc.).
+
+    Returns
+    -------
+    dict
+        Chart names → Plotly figure JSON dicts.
+    """
+    charts: dict = {}
+
+    charts["spending_over_time"] = chart_spending_over_time(df, schema)
+    charts["category_breakdown"] = chart_category_breakdown(df, schema)
+    charts["payer_comparison"] = chart_payer_comparison(df, schema)
+
+    anomalies = analysis_results.get("anomalies", {})
+    charts["anomaly_heatmap"] = chart_anomaly_heatmap(df, anomalies, schema)
+
+    forecast = analysis_results.get("forecast", {})
+    charts["forecast"] = chart_forecast(forecast)
+
+    charts["spending_heatmap"] = chart_spending_heatmap(df, schema)
+    charts["top_merchants"] = chart_top_merchants(df, schema)
+
+    payer_network = analysis_results.get("payer_network", {})
+    charts["settlement_flow"] = chart_settlement_flow(payer_network)
+
+    recommendations_list = analysis_results.get("recommendations", [])
+    charts["recommendation_impact"] = chart_recommendation_impact(recommendations_list)
+
     return charts
-
-
-def generate_kpi_card(output_dir, title, value, filename, color=None):
-    """Generates a professional KPI card image."""
-    if color is None:
-        color = COLORS['primary']
-
-    fig, ax = plt.subplots(figsize=(4, 2.2))
-    ax.text(0.5, 0.75, title, ha='center', va='center', fontsize=11, color=COLORS['gray'], fontweight='500')
-    ax.text(0.5, 0.35, str(value), ha='center', va='center', fontsize=22, fontweight='bold', color=color)
-    ax.axis('off')
-    fig.patch.set_facecolor('white')
-    path = save_plot(output_dir, filename)
-    return {"title": title, "path": path}
-
-
-def save_plot(output_dir, filename):
-    plt.tight_layout()
-    path = os.path.join(output_dir, filename)
-    plt.savefig(path, dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
-    plt.close()
-    return filename

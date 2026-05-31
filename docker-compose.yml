@@ -1,0 +1,59 @@
+version: '3.9'
+
+services:
+  # ── FastAPI Backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai_expense_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./sql_app.db}
+      - SECRET_KEY=${SECRET_KEY:-changeme-in-production}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - FRONTEND_URL=http://localhost:5173
+    volumes:
+      - ./backend/static:/app/static
+      - ./backend/sql_app.db:/app/sql_app.db
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - ai_expense_net
+
+  # ── Redis (AI result caching) ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ai_expense_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - ai_expense_net
+
+  # ── Frontend (Vite dev) ─────────────────────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: ai_expense_frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - ai_expense_net
+
+networks:
+  ai_expense_net:
+    driver: bridge
+
+volumes:
+  static_data:
